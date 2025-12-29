@@ -109,12 +109,6 @@ func (le *LiquidationEngine) CheckPosition(position *domain.Position) {
 		return
 	}
 
-	indexPrice, err := le.markPriceCalc.CalculateIndexPrice(le.ctx, position.Symbol)
-	if err != nil {
-		log.Printf("Error calculating index price: %v", err)
-		return
-	}
-
 	if le.riskEngine.CheckLiquidation(position, markPrice) {
 		log.Printf("Liquidation triggered for position %s at mark price %.2f",
 			position.ID, markPrice.InexactFloat64())
