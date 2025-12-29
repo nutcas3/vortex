@@ -197,17 +197,15 @@ func (h *TradingHandler) createOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Execute order (placeholder - matching engine method doesn't exist yet)
-	// TODO: Implement ProcessOrder method in MatchingEngine
-	// trades, err := h.matchingEngine.ProcessOrder(r.Context(), order, account)
-	// if err != nil {
-	// 	http.Error(w, err.Error(), http.StatusBadRequest)
-	// 	return
-	// }
-	var trades []*domain.Trade // Placeholder
+	// Execute order
+	trades, err := h.matchingEngine.ProcessOrder(r.Context(), order, account)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	// Return order with execution results
-	response := map[string]interface{}{
+	response := map[string]any{
 		"order_id":   order.ID,
 		"symbol":     order.Symbol,
 		"side":       order.Side,
@@ -266,7 +264,7 @@ func (h *TradingHandler) getOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := map[string]interface{}{
+	response := map[string]any{
 		"id":            order.ID,
 		"symbol":        order.Symbol,
 		"side":          order.Side,
@@ -324,7 +322,7 @@ func (h *TradingHandler) cancelOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := map[string]interface{}{
+	response := map[string]any{
 		"order_id": orderID,
 		"status":   "CANCELLED",
 		"symbol":   "BTC-PERP", // Placeholder
@@ -412,9 +410,9 @@ func (h *TradingHandler) Fills(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Convert to response format
-	response := make([]map[string]interface{}, len(trades))
+	response := make([]map[string]any, len(trades))
 	for i, trade := range trades {
-		response[i] = map[string]interface{}{
+		response[i] = map[string]any{
 			"id":               trade.ID,
 			"symbol":           trade.Symbol,
 			"price":            trade.Price.String(),

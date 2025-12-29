@@ -42,6 +42,11 @@ func (me *MatchingEngine) GetOrCreateOrderBook(symbol string) *OrderBook {
 	return book
 }
 
+// ProcessOrder is an alias for SubmitOrder for consistency with handler naming
+func (me *MatchingEngine) ProcessOrder(ctx context.Context, order *domain.Order, account *domain.Account) ([]*domain.Trade, error) {
+	return me.SubmitOrder(ctx, order, account)
+}
+
 // SubmitOrder processes a new order
 func (me *MatchingEngine) SubmitOrder(ctx context.Context, order *domain.Order, account *domain.Account) ([]*domain.Trade, error) {
 	// 1. Risk check before matching
