@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"time"
 
 	"github.com/shopspring/decimal"
 )
@@ -11,6 +12,7 @@ type TradeRepository interface {
 	FindByUser(ctx context.Context, userID string) ([]*Trade, error)
 	FindBySymbol(ctx context.Context, symbol string, limit int) ([]*Trade, error)
 	GetTradesByUser(ctx context.Context, userID, symbol string, limit int) ([]*Trade, error)
+	GetTradesSince(ctx context.Context, symbol string, since time.Time) ([]*Trade, error)
 }
 
 // AccountRepository manages user accounts
