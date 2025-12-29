@@ -281,10 +281,85 @@ func (h *TradingHandler) getOrder(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TradingHandler) updateOrder(w http.ResponseWriter, r *http.Request) {
-	// TODO: Implement order modification (quantity reduction)
-	response := map[string]string{
-		"message": "Order modification - TODO: Implement",
+	var req struct {
+		OrderID  string `json:"order_id"`
+		Quantity string `json:"quantity"` // New quantity (must be less than current)
 	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.OrderID == "" {
+		http.Error(w, "Order ID required", http.StatusBadRequest)
+		return
+	}
+
+	// Get user ID from authentication context
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		userID = "user_123" // Fallback for development
+	}
+
+	// Parse new quantity
+	newQuantity, err := decimal.NewFromString(req.Quantity)
+	if err != nil {
+		http.Error(w, "Invalid quantity", http.StatusBadRequest)
+		return
+	}
+
+	// Get order from repository
+	order, err := h.orderRepo.GetByID(r.Context(), req.OrderID)
+	if err != nil {
+		http.Error(w, "Order not found", http.StatusNotFound)
+		return
+	}
+
+	// Verify ownership
+	if order.UserID != userID {
+		http.Error(w, "Access denied", http.StatusForbidden)
+		return
+	}
+
+	// Check if order can be modified (only open/pending orders)
+	if order.Status != domain.OrderStatusOpen && order.Status != domain.OrderStatusPending {
+		http.Error(w, "Order cannot be modified", http.StatusBadRequest)
+		return
+	}
+
+	// Check if new quantity is less than current quantity and filled quantity
+	remainingQty := order.Quantity.Sub(order.FilledQty)
+	if newQuantity.GreaterThanOrEqual(order.Quantity) || newQuantity.LessThan(order.FilledQty) {
+		http.Error(w, "Invalid quantity for modification", http.StatusBadRequest)
+		return
+	}
+
+	// Update order quantity
+	order.Quantity = newQuantity
+
+	// Save updated order to repository
+	err = h.orderRepo.Update(r.Context(), order)
+	if err != nil {
+		http.Error(w, "Failed to update order", http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]any{
+		"message": "Order updated successfully",
+		"order": map[string]any{
+			"id":         order.ID,
+			"symbol":     order.Symbol,
+			"side":       order.Side,
+			"type":       order.Type,
+			"price":      order.Price.String(),
+			"quantity":   order.Quantity.String(),
+			"filled_qty": order.FilledQty.String(),
+			"status":     order.Status,
+			"remaining":  remainingQty.String(),
+		},
+	}
+
 	json.NewEncoder(w).Encode(response)
 }
 
