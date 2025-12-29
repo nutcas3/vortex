@@ -1,0 +1,107 @@
+package risk
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"math"
+	"time"
+
+	"vortex/internal/domain"
+	"vortex/pkg/utils"
+	"github.com/shopspring/decimal"
+)
+
+// MarkPriceCalculator computes the fair price for margin calculations
+type MarkPriceCalculator struct {
+	marketDataProvider domain.MarketDataProvider
+}
+
+// NewMarkPriceCalculator creates a new mark price calculator
+func NewMarkPriceCalculator(mdp domain.MarketDataProvider) *MarkPriceCalculator {
+	return &MarkPriceCalculator{
+		marketDataProvider: mdp,
+	}
+}
+
+// CalculateMarkPrice computes mark price using Fair Price Marking
+// Formula: MarkPrice = IndexPrice + EMA(Perpetual - Index)
+func (mpc *MarkPriceCalculator) CalculateMarkPrice(ctx context.Context, symbol string, lastPrice utils.Decimal) (utils.Decimal, error) {
+	indexPrice, err := mpc.marketDataProvider.GetIndexPrice(ctx, symbol)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get index price: %w", err)
+	}
+
+	// Calculate basis (premium/discount)
+	basis := lastPrice - indexPrice
+
+	// Apply exponential moving average (EMA) to smooth basis
+	// In production: maintain historical EMA state
+	emaBasis := basis * 0.3 // Simplified: 30% weight on current basis
+
+	markPrice := indexPrice + emaBasis
+
+	// Sanity check: mark price shouldn't deviate too much
+	maxDeviation := indexPrice * 0.1 // 10% max deviation
+	if math.Abs(float64(markPrice-indexPrice)) > float64(maxDeviation) {
+		log.Printf("WARNING: Mark price %.2f deviates significantly from index %.2f",
+			markPrice, indexPrice)
+		markPrice = indexPrice // Fall back to index price
+	}
+
+	return markPrice, nil
+}
+
+// FundingRateCalculator computes the funding rate for perpetual swaps
+type FundingRateCalculator struct {
+	config             Config
+	marketDataProvider domain.MarketDataProvider
+}
+
+// NewFundingRateCalculator creates a new funding rate calculator
+func NewFundingRateCalculator(config Config, mdp domain.MarketDataProvider) *FundingRateCalculator {
+	return &FundingRateCalculator{
+		config:             config,
+		marketDataProvider: mdp,
+	}
+}
+
+// CalculateFundingRate computes the 8-hour funding rate
+// Formula: FundingRate = Premium_Index + clamp(Interest_Rate - Premium_Index, 0.05%, -0.05%)
+func (frc *FundingRateCalculator) CalculateFundingRate(ctx context.Context, symbol string, markPrice, indexPrice utils.Decimal) (utils.Decimal, error) {
+	// Premium Index = (MarkPrice - IndexPrice) / IndexPrice
+	premiumIndex := (markPrice - indexPrice) / indexPrice
+
+	// Interest Rate (typically small, e.g., 0.01% per 8 hours)
+	interestRate := utils.Decimal(0.0001)
+
+	// Calculate funding rate
+	fundingRate := premiumIndex + utils.Clamp(
+		interestRate-premiumIndex,
+		-utils.Decimal(0.0005), // -0.05%
+		utils.Decimal(0.0005),  // +0.05%
+	)
+
+	// Apply funding rate cap
+	fundingRate = utils.Clamp(fundingRate, -frc.config.FundingRateCap, frc.config.FundingRateCap)
+
+	return fundingRate, nil
+}
+
+// ApplyFunding applies funding payment to a position
+// Positive funding rate: longs pay shorts
+// Negative funding rate: shorts pay longs
+func (frc *FundingRateCalculator) ApplyFunding(position *domain.Position, fundingRate utils.Decimal) utils.Decimal {
+	notionalValue := position.Size * position.MarkPrice
+	fundingPayment := notionalValue * fundingRate
+
+	// Longs pay when funding is positive
+	if position.Side == domain.SideBuy {
+		fundingPayment = -fundingPayment
+	}
+
+	position.RealizedPnL += fundingPayment
+	position.LastFundingTime = time.Now()
+
+	return fundingPayment
+}
