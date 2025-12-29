@@ -31,7 +31,7 @@ func (h *AccountHandler) Account(w http.ResponseWriter, r *http.Request) {
 	// TODO: Get user ID from authentication context
 	userID := "user_123" // Placeholder
 
-	account, err := h.accountRepo.GetByUserID(r.Context(), userID)
+	account, err := h.accountRepo.Get(r.Context(), userID)
 	if err != nil {
 		http.Error(w, "Account not found", http.StatusNotFound)
 		return
@@ -69,7 +69,7 @@ func (h *AccountHandler) getPositions(w http.ResponseWriter, r *http.Request) {
 	// TODO: Get user ID from authentication context
 	userID := "user_123" // Placeholder
 
-	positions, err := h.positionRepo.GetByUserID(r.Context(), userID)
+	positions, err := h.positionRepo.FindByUser(r.Context(), userID)
 	if err != nil {
 		http.Error(w, "Failed to get positions", http.StatusInternalServerError)
 		return
