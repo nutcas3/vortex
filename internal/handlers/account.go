@@ -5,6 +5,8 @@ import (
 	"net/http"
 
 	"vortex/internal/domain"
+
+	"github.com/shopspring/decimal"
 )
 
 type AccountHandler struct {
@@ -113,14 +115,82 @@ func (h *AccountHandler) createPosition(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// TODO: Get user ID from authentication context
-	// userID := "user_123" // Placeholder
+	// Get user ID from authentication context
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		userID = "user_123" // Fallback for development
+	}
 
-	// TODO: Parse decimal values and create position
-	// This would typically be done through order execution rather than direct position creation
+	// Parse decimal values
+	size, err := decimal.NewFromString(req.Size)
+	if err != nil {
+		http.Error(w, "Invalid size", http.StatusBadRequest)
+		return
+	}
 
-	response := map[string]string{
-		"message": "Position creation through orders - TODO: Implement order execution first",
+	var price decimal.Decimal
+	if req.Price != "" {
+		price, err = decimal.NewFromString(req.Price)
+		if err != nil {
+			http.Error(w, "Invalid price", http.StatusBadRequest)
+			return
+		}
+	}
+
+	var leverage decimal.Decimal
+	if req.Leverage != "" {
+		leverage, err = decimal.NewFromString(req.Leverage)
+		if err != nil {
+			http.Error(w, "Invalid leverage", http.StatusBadRequest)
+			return
+		}
+	} else {
+		leverage = decimal.NewFromInt(10) // Default 10x leverage
+	}
+
+	// Calculate margin requirement
+	margin := size.Mul(price).Div(leverage)
+
+	// Create position
+	position := &domain.Position{
+		ID:               "pos_" + userID + "_" + req.Symbol,
+		UserID:           userID,
+		Symbol:           req.Symbol,
+		Side:             req.Side,
+		Size:             size,
+		EntryPrice:       price,
+		MarkPrice:        price,        // Initially same as entry price
+		LiquidationPrice: decimal.Zero, // Will be calculated
+		Margin:           margin,
+		UnrealizedPnL:    decimal.Zero,
+		RealizedPnL:      decimal.Zero,
+		Status:           domain.PositionStatusOpen,
+		Leverage:         leverage,
+	}
+
+	// Save position to repository
+	err = h.positionRepo.Save(r.Context(), position)
+	if err != nil {
+		http.Error(w, "Failed to create position", http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"message": "Position created successfully",
+		"position": map[string]interface{}{
+			"id":                position.ID,
+			"symbol":            position.Symbol,
+			"side":              position.Side,
+			"size":              position.Size.String(),
+			"entry_price":       position.EntryPrice.String(),
+			"mark_price":        position.MarkPrice.String(),
+			"liquidation_price": position.LiquidationPrice.String(),
+			"margin":            position.Margin.String(),
+			"unrealized_pnl":    position.UnrealizedPnL.String(),
+			"realized_pnl":      position.RealizedPnL.String(),
+			"status":            position.Status,
+			"leverage":          position.Leverage.String(),
+		},
 	}
 
 	json.NewEncoder(w).Encode(response)
