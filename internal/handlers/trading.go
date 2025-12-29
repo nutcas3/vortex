@@ -138,8 +138,11 @@ func (h *TradingHandler) createOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Get user ID from authentication context
-	userID := "user_123" // Placeholder
+	// Get user ID from authentication context
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		userID = "user_123" // Fallback for development
+	}
 
 	// Parse decimal values
 	quantity, err := decimal.NewFromString(req.Quantity)
@@ -166,28 +169,36 @@ func (h *TradingHandler) createOrder(w http.ResponseWriter, r *http.Request) {
 		req.TimeInForce = "GTC"
 	}
 
-	// Create order (simplified for placeholder)
+	// Create order
 	order := &domain.Order{
-		ID: id.GenerateID("order"),
-		// UserID:      userID, // Not used in placeholder
-		Symbol:    req.Symbol,
-		Side:      req.Side,
-		Type:      req.Type,
-		Price:     price,
-		Quantity:  quantity,
-		FilledQty: decimal.Zero,
-		Status:    domain.OrderStatusPending,
-		// TimeInForce: req.TimeInForce, // Not used in placeholder
+		ID:          id.GenerateID("order"),
+		UserID:      userID,
+		Symbol:      req.Symbol,
+		Side:        req.Side,
+		Type:        req.Type,
+		Price:       price,
+		Quantity:    quantity,
+		FilledQty:   decimal.Zero,
+		Status:      domain.OrderStatusPending,
+		TimeInForce: req.TimeInForce,
 	}
 
-	// Get account for validation (placeholder - not used yet)
-	// account, err := h.accountRepo.Get(r.Context(), userID)
-	// if err != nil {
-	// 	http.Error(w, "Account not found", http.StatusNotFound)
-	// 	return
-	// }
+	// Save order to repository first
+	err = h.orderRepo.Create(r.Context(), order)
+	if err != nil {
+		http.Error(w, "Failed to create order", http.StatusInternalServerError)
+		return
+	}
 
-	// Execute order (placeholder - method doesn't exist yet)
+	// Get account for validation
+	account, err := h.accountRepo.Get(r.Context(), userID)
+	if err != nil {
+		http.Error(w, "Account not found", http.StatusNotFound)
+		return
+	}
+
+	// Execute order (placeholder - matching engine method doesn't exist yet)
+	// TODO: Implement ProcessOrder method in MatchingEngine
 	// trades, err := h.matchingEngine.ProcessOrder(r.Context(), order, account)
 	// if err != nil {
 	// 	http.Error(w, err.Error(), http.StatusBadRequest)
@@ -228,7 +239,7 @@ func (h *TradingHandler) Order(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *TradingHandler) getOrder(w http.ResponseWriter, _ *http.Request) {
+func (h *TradingHandler) getOrder(w http.ResponseWriter, r *http.Request) {
 	// Get order ID from URL path or query param
 	orderID := r.URL.Query().Get("orderId")
 	if orderID == "" {
@@ -237,7 +248,10 @@ func (h *TradingHandler) getOrder(w http.ResponseWriter, _ *http.Request) {
 	}
 
 	// TODO: Get user ID from authentication context
-	userID := "user_123" // Placeholder
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		userID = "user_123" // Fallback for development
+	}
 
 	// Get order from repository
 	order, err := h.orderRepo.GetByID(r.Context(), orderID)
@@ -285,7 +299,10 @@ func (h *TradingHandler) cancelOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// TODO: Get user ID from authentication context
-	userID := "user_123" // Placeholder
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		userID = "user_123" // Fallback for development
+	}
 
 	// Get order from repository
 	order, err := h.orderRepo.GetByID(r.Context(), orderID)
