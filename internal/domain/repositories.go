@@ -10,6 +10,7 @@ type TradeRepository interface {
 	Save(ctx context.Context, trade *Trade) error
 	FindByUser(ctx context.Context, userID string) ([]*Trade, error)
 	FindBySymbol(ctx context.Context, symbol string, limit int) ([]*Trade, error)
+	GetTradesByUser(ctx context.Context, userID, symbol string, limit int) ([]*Trade, error)
 }
 
 // AccountRepository manages user accounts
