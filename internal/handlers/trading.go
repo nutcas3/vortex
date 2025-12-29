@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
-	"time"
 
 	"vortex/internal/domain"
 	"vortex/internal/trading"
@@ -358,55 +357,11 @@ func (h *TradingHandler) Fills(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Get user's trade fills (placeholder - method doesn't exist yet)
-	// trades, err := h.tradeRepo.GetTradesByUser(r.Context(), userID, symbol, limit)
-	// if err != nil {
-	// 	http.Error(w, "Failed to get fills", http.StatusInternalServerError)
-	// 	return
-	// }
-
-	// Return mock trade fills for now
-	trades := []*domain.Trade{
-		{
-			ID:           "trade_123",
-			Symbol:       "BTC-PERP",
-			Price:        decimal.NewFromInt(50000),
-			Quantity:     decimal.NewFromInt(1),
-			BuyOrderID:   "order_123",
-			SellOrderID:  "order_124",
-			BuyerID:      userID,
-			SellerID:     "user_456",
-			IsBuyerMaker: false,
-			Timestamp:    time.Now(),
-		},
-		{
-			ID:           "trade_124",
-			Symbol:       "BTC-PERP",
-			Price:        decimal.NewFromInt(50000),
-			Quantity:     decimal.NewFromInt(2),
-			BuyOrderID:   "order_125",
-			SellOrderID:  "order_126",
-			BuyerID:      "user_456",
-			SellerID:     userID,
-			IsBuyerMaker: true,
-			Timestamp:    time.Now().Add(-1 * time.Hour),
-		},
-	}
-
-	// Filter by symbol if specified
-	if symbol != "" {
-		filteredTrades := make([]*domain.Trade, 0)
-		for _, trade := range trades {
-			if trade.Symbol == symbol {
-				filteredTrades = append(filteredTrades, trade)
-			}
-		}
-		trades = filteredTrades
-	}
-
-	// Apply limit
-	if len(trades) > limit {
-		trades = trades[:limit]
+	// Get user's trade fills from repository
+	trades, err := h.tradeRepo.GetTradesByUser(r.Context(), userID, symbol, limit)
+	if err != nil {
+		http.Error(w, "Failed to get fills", http.StatusInternalServerError)
+		return
 	}
 
 	// Convert to response format
