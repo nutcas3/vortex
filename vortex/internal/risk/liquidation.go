@@ -109,9 +109,15 @@ func (le *LiquidationEngine) CheckPosition(position *domain.Position) {
 		return
 	}
 
+	indexPrice, err := le.markPriceCalc.CalculateIndexPrice(le.ctx, position.Symbol)
+	if err != nil {
+		log.Printf("Error calculating index price: %v", err)
+		return
+	}
+
 	if le.riskEngine.CheckLiquidation(position, markPrice) {
 		log.Printf("Liquidation triggered for position %s at mark price %.2f",
-			position.ID, markPrice)
+			position.ID, markPrice.InexactFloat64())
 
 		// Send to liquidation queue
 		select {
@@ -136,7 +142,7 @@ func (le *LiquidationEngine) executeLiquidations() {
 // liquidatePosition closes a position by submitting a market order
 func (le *LiquidationEngine) liquidatePosition(position *domain.Position) error {
 	log.Printf("Executing liquidation for position %s (user: %s, size: %.4f)",
-		position.ID, position.UserID, position.Size)
+		position.ID, position.UserID, position.Size.InexactFloat64())
 
 	// 1. Create liquidation order (opposite side, market order)
 	liquidationOrder := &domain.Order{
@@ -201,7 +207,7 @@ func (le *LiquidationEngine) liquidatePosition(position *domain.Position) error 
 	}
 
 	log.Printf("Liquidation completed: position %s, realized PnL: %.2f",
-		position.ID, position.RealizedPnL)
+		position.ID, position.RealizedPnL.InexactFloat64())
 
 	return nil
 }

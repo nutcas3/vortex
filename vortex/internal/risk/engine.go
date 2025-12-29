@@ -66,7 +66,7 @@ func (re *Engine) ValidateOrder(order *domain.Order, account *domain.Account) er
 	// 2. Check available margin
 	if requiredMargin.GreaterThan(account.AvailableMargin) {
 		return fmt.Errorf("insufficient margin: need %.2f, have %.2f",
-			requiredMargin, account.AvailableMargin)
+			requiredMargin.InexactFloat64(), account.AvailableMargin.InexactFloat64())
 	}
 
 	// 3. Validate leverage doesn't exceed max
@@ -81,7 +81,7 @@ func (re *Engine) ValidateOrder(order *domain.Order, account *domain.Account) er
 		effectiveLeverage := newSize.Mul(order.Price).Div(account.TotalEquity)
 		if effectiveLeverage.GreaterThan(re.config.MaxLeverage) {
 			return fmt.Errorf("leverage %.2fx exceeds maximum %.2fx",
-				effectiveLeverage, re.config.MaxLeverage)
+				effectiveLeverage.InexactFloat64(), re.config.MaxLeverage.InexactFloat64())
 		}
 	}
 

@@ -45,7 +45,7 @@ func (mpc *MarkPriceCalculator) CalculateMarkPrice(ctx context.Context, symbol s
 	maxDeviation := indexPrice.Mul(math.Point1) // 10% max deviation
 	if math.Abs(markPrice.Sub(indexPrice)).GreaterThan(maxDeviation) {
 		log.Printf("WARNING: Mark price %.2f deviates significantly from index %.2f",
-			markPrice, indexPrice)
+			markPrice.InexactFloat64(), indexPrice.InexactFloat64())
 		markPrice = indexPrice // Fall back to index price
 	}
 
