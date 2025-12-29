@@ -15,14 +15,14 @@ import (
 
 type TradingHandler struct {
 	matchingEngine *trading.MatchingEngine
-	orderRepo      domain.TradeRepository // Using TradeRepository since OrderRepository doesn't exist
+	orderRepo      domain.OrderRepository
 	tradeRepo      domain.TradeRepository
 	accountRepo    domain.AccountRepository
 }
 
 func NewTradingHandler(
 	matchingEngine *trading.MatchingEngine,
-	orderRepo domain.TradeRepository, // Using TradeRepository since OrderRepository doesn't exist
+	orderRepo domain.OrderRepository,
 	tradeRepo domain.TradeRepository,
 	accountRepo domain.AccountRepository,
 ) *TradingHandler {
@@ -68,40 +68,11 @@ func (h *TradingHandler) getOrders(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Get orders from repository when implemented
-	// TODO: Implement OrderRepository interface and method
-	// orders, err := h.orderRepo.GetOrdersByUser(r.Context(), userID, symbol, status, limit)
-	// if err != nil {
-	// 	http.Error(w, "Failed to get orders", http.StatusInternalServerError)
-	// 	return
-	// }
-
-	// Return mock orders for now
-	orders := []*domain.Order{
-		{
-			ID:          "order_123",
-			UserID:      userID,
-			Symbol:      "BTC-PERP",
-			Side:        domain.SideBuy,
-			Type:        domain.OrderTypeLimit,
-			Price:       decimal.NewFromInt(50000),
-			Quantity:    decimal.NewFromInt(1),
-			FilledQty:   decimal.NewFromFloat(0.5),
-			Status:      domain.OrderStatusOpen,
-			TimeInForce: "GTC",
-		},
-		{
-			ID:          "order_124",
-			UserID:      userID,
-			Symbol:      "BTC-PERP",
-			Side:        domain.SideSell,
-			Type:        domain.OrderTypeLimit,
-			Price:       decimal.NewFromInt(51000),
-			Quantity:    decimal.NewFromInt(2),
-			FilledQty:   decimal.NewFromFloat(1),
-			Status:      domain.OrderStatusFilled,
-			TimeInForce: "GTC",
-		},
+	// Get orders from repository
+	orders, err := h.orderRepo.GetOrdersByUser(r.Context(), userID, symbol, status, limit)
+	if err != nil {
+		http.Error(w, "Failed to get orders", http.StatusInternalServerError)
+		return
 	}
 
 	// Filter by symbol if specified
@@ -268,23 +239,11 @@ func (h *TradingHandler) getOrder(w http.ResponseWriter, _ *http.Request) {
 	// TODO: Get user ID from authentication context
 	userID := "user_123" // Placeholder
 
-	// Get order (placeholder - TradeRepository doesn't have GetByID method)
-	// order, err := h.orderRepo.GetByID(r.Context(), orderID)
-	// if err != nil {
-	// 	http.Error(w, "Order not found", http.StatusNotFound)
-	// 	return
-	// }
-	// Create placeholder order for response
-	order := &domain.Order{
-		ID:     orderID,
-		Status: domain.OrderStatusOpen,
-		// Symbol:    "BTC-PERP", // Not used in placeholder
-		// Side:      domain.SideBuy, // Not used in placeholder
-		// Type:      domain.OrderTypeLimit, // Not used in placeholder
-		// Price:     decimal.NewFromInt(50000), // Not used in placeholder
-		// Quantity:  decimal.NewFromInt(1), // Not used in placeholder
-		// FilledQty: decimal.Zero, // Not used in placeholder
-		UserID: userID, // Used for ownership check
+	// Get order from repository
+	order, err := h.orderRepo.GetByID(r.Context(), orderID)
+	if err != nil {
+		http.Error(w, "Order not found", http.StatusNotFound)
+		return
 	}
 
 	// Verify ownership
@@ -302,7 +261,7 @@ func (h *TradingHandler) getOrder(w http.ResponseWriter, _ *http.Request) {
 		"quantity":      order.Quantity.String(),
 		"filled_qty":    order.FilledQty.String(),
 		"status":        order.Status,
-		"time_in_force": "GTC",                  // Placeholder
+		"time_in_force": order.TimeInForce,
 		"created_at":    "2023-01-01T00:00:00Z", // Placeholder - field doesn't exist
 		"updated_at":    "2023-01-01T00:00:00Z", // Placeholder - field doesn't exist
 	}
@@ -328,23 +287,11 @@ func (h *TradingHandler) cancelOrder(w http.ResponseWriter, r *http.Request) {
 	// TODO: Get user ID from authentication context
 	userID := "user_123" // Placeholder
 
-	// Get order (placeholder for cancel operation)
-	// order, err := h.orderRepo.GetByID(r.Context(), orderID)
-	// if err != nil {
-	// 	http.Error(w, "Order not found", http.StatusNotFound)
-	// 	return
-	// }
-	// Create placeholder order for response
-	order := &domain.Order{
-		// ID:        orderID, // Not used in placeholder
-		Status: domain.OrderStatusOpen,
-		// Symbol:    "BTC-PERP", // Not used in placeholder
-		// Side:      domain.SideBuy, // Not used in placeholder
-		// Type:      domain.OrderTypeLimit, // Not used in placeholder
-		// Price:     decimal.NewFromInt(50000), // Not used in placeholder
-		// Quantity:  decimal.NewFromInt(1), // Not used in placeholder
-		// FilledQty: decimal.Zero, // Not used in placeholder
-		UserID: userID, // Used for ownership check
+	// Get order from repository
+	order, err := h.orderRepo.GetByID(r.Context(), orderID)
+	if err != nil {
+		http.Error(w, "Order not found", http.StatusNotFound)
+		return
 	}
 
 	// Verify ownership
@@ -353,15 +300,12 @@ func (h *TradingHandler) cancelOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Cancel order (placeholder - method doesn't exist yet)
-	// err = h.matchingEngine.CancelOrder(r.Context(), orderID)
-	// if err != nil {
-	// 	http.Error(w, err.Error(), http.StatusBadRequest)
-	// 	return
-	// }
-	// For now, just update order status
-	// order.Status = domain.OrderStatusCancelled
-	// TODO: Save order status to repository
+	// Cancel order using repository
+	err = h.orderRepo.Delete(r.Context(), orderID)
+	if err != nil {
+		http.Error(w, "Failed to cancel order", http.StatusInternalServerError)
+		return
+	}
 
 	response := map[string]interface{}{
 		"order_id": orderID,
