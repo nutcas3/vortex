@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"math"
 	"time"
 
 	"vortex/internal/domain"
@@ -80,7 +79,7 @@ func (frc *FundingRateCalculator) CalculateFundingRate(ctx context.Context, symb
 	fundingRate := premiumIndex.Add(math.Clamp(
 		interestRate.Sub(premiumIndex),
 		decimal.NewFromFloat(-0.0005), // -0.05%
-		decimal.NewFromFloat(0.0005)  // +0.05%
+		decimal.NewFromFloat(0.0005),  // +0.05%
 	))
 
 	// Apply funding rate cap
@@ -98,10 +97,10 @@ func (frc *FundingRateCalculator) ApplyFunding(position *domain.Position, fundin
 
 	// Longs pay when funding is positive
 	if position.Side == domain.SideBuy {
-		fundingPayment = -fundingPayment
+		fundingPayment = fundingPayment.Neg()
 	}
 
-	position.RealizedPnL += fundingPayment
+	position.RealizedPnL = position.RealizedPnL.Add(fundingPayment)
 	position.LastFundingTime = time.Now()
 
 	return fundingPayment
