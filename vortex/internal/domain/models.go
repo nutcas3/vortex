@@ -46,7 +46,7 @@ type Order struct {
 	Symbol      string // e.g., "BTC-PERP"
 	Side        Side
 	Type        OrderType
-	Price       utils.Decimal // For limit orders; 0 for market orders
+	Price       decimal.Decimal // For limit orders; 0 for market orders
 	Quantity    utils.Decimal
 	FilledQty   utils.Decimal
 	Status      OrderStatus
@@ -61,14 +61,14 @@ type Position struct {
 	UserID           string
 	Symbol           string
 	Side             Side
-	Size             utils.Decimal // Positive for long, negative for short
-	EntryPrice       utils.Decimal
-	MarkPrice        utils.Decimal
-	LiquidationPrice utils.Decimal
-	Leverage         utils.Decimal
-	Margin           utils.Decimal // Initial margin allocated
-	UnrealizedPnL    utils.Decimal
-	RealizedPnL      utils.Decimal
+	Size             decimal.Decimal // Positive for long, negative for short
+	EntryPrice       decimal.Decimal
+	MarkPrice        decimal.Decimal
+	LiquidationPrice decimal.Decimal
+	Leverage         decimal.Decimal
+	Margin           decimal.Decimal // Initial margin allocated
+	UnrealizedPnL    decimal.Decimal
+	RealizedPnL      decimal.Decimal
 	Status           PositionStatus
 	LastFundingTime  time.Time
 	CreatedAt        time.Time
@@ -79,8 +79,8 @@ type Position struct {
 type Trade struct {
 	ID           string
 	Symbol       string
-	Price        utils.Decimal
-	Quantity     utils.Decimal
+	Price        decimal.Decimal
+	Quantity     decimal.Decimal
 	BuyOrderID   string
 	SellOrderID  string
 	BuyerID      string
