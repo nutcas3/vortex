@@ -6,14 +6,15 @@ import (
 	"sync"
 
 	"vortex/internal/domain"
-	"vortex/pkg/utils"
+
+	"github.com/shopspring/decimal"
 )
 
 // PriceLevel represents all orders at a specific price
 type PriceLevel struct {
-	Price  utils.Decimal
+	Price  decimal.Decimal
 	Orders []*domain.Order
-	Volume utils.Decimal
+	Volume decimal.Decimal
 	index  int // heap index
 }
 
@@ -21,7 +22,7 @@ type PriceLevel struct {
 type OrderBookSide struct {
 	levels   []*PriceLevel
 	isAsk    bool
-	priceMap map[utils.Decimal]*PriceLevel
+	priceMap map[decimal.Decimal]*PriceLevel
 }
 
 func (obs *OrderBookSide) Len() int { return len(obs.levels) }
@@ -73,12 +74,12 @@ func NewOrderBook(symbol string) *OrderBook {
 	bids := &OrderBookSide{
 		levels:   make([]*PriceLevel, 0),
 		isAsk:    false,
-		priceMap: make(map[utils.Decimal]*PriceLevel),
+		priceMap: make(map[decimal.Decimal]*PriceLevel),
 	}
 	asks := &OrderBookSide{
 		levels:   make([]*PriceLevel, 0),
 		isAsk:    true,
-		priceMap: make(map[utils.Decimal]*PriceLevel),
+		priceMap: make(map[decimal.Decimal]*PriceLevel),
 	}
 	heap.Init(bids)
 	heap.Init(asks)
@@ -163,7 +164,7 @@ func (ob *OrderBook) RemoveOrder(orderID string) error {
 }
 
 // GetBestBid returns the highest buy price
-func (ob *OrderBook) GetBestBid() (utils.Decimal, bool) {
+func (ob *OrderBook) GetBestBid() (decimal.Decimal, bool) {
 	ob.mu.RLock()
 	defer ob.mu.RUnlock()
 
@@ -174,7 +175,7 @@ func (ob *OrderBook) GetBestBid() (utils.Decimal, bool) {
 }
 
 // GetBestAsk returns the lowest sell price
-func (ob *OrderBook) GetBestAsk() (utils.Decimal, bool) {
+func (ob *OrderBook) GetBestAsk() (decimal.Decimal, bool) {
 	ob.mu.RLock()
 	defer ob.mu.RUnlock()
 
@@ -185,7 +186,7 @@ func (ob *OrderBook) GetBestAsk() (utils.Decimal, bool) {
 }
 
 // GetSpread returns the bid-ask spread
-func (ob *OrderBook) GetSpread() utils.Decimal {
+func (ob *OrderBook) GetSpread() decimal.Decimal {
 	bid, bidExists := ob.GetBestBid()
 	ask, askExists := ob.GetBestAsk()
 

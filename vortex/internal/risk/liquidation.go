@@ -10,6 +10,8 @@ import (
 	"vortex/internal/domain"
 	"vortex/internal/trading"
 	"vortex/pkg/utils"
+
+	"github.com/shopspring/decimal"
 )
 
 // LiquidationEngine monitors and executes liquidations
@@ -171,7 +173,7 @@ func (le *LiquidationEngine) liquidatePosition(position *domain.Position) error 
 	position.Status = domain.PositionStatusLiquidated
 
 	// Calculate realized PnL from liquidation
-	var totalPnL utils.Decimal
+	var totalPnL decimal.Decimal
 	for _, trade := range trades {
 		pnl := (trade.Price - position.EntryPrice) * trade.Quantity
 		if position.Side == domain.SideSell {

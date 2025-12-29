@@ -1,22 +1,23 @@
 package risk
 
 import (
-	"fmt"
+	"fmt"	
 	"time"
 
 	"vortex/internal/domain"
-	"vortex/pkg/utils"
+
 	"github.com/shopspring/decimal"
+	"vortex/pkg/math"
 )
 
 type Config struct {
 	Symbol                string
-	MaintenanceMarginRate utils.Decimal // e.g., 0.005 = 0.5%
-	InitialMarginRate     utils.Decimal // e.g., 0.01 = 1% (100x leverage)
-	MaxLeverage           utils.Decimal
-	FundingInterval       time.Duration // e.g., 8 hours
-	FundingRateCap        utils.Decimal // e.g., 0.0075 = 0.75%
-	ImpactMarginNotional  utils.Decimal // For mark price calculation
+	MaintenanceMarginRate decimal.Decimal // e.g., 0.005 = 0.5%
+	InitialMarginRate     decimal.Decimal // e.g., 0.01 = 1% (100x leverage)
+	MaxLeverage           decimal.Decimal
+	FundingInterval       time.Duration   // e.g., 8 hours
+	FundingRateCap        decimal.Decimal // e.g., 0.0075 = 0.75%
+	ImpactMarginNotional  decimal.Decimal // For mark price calculation
 }
 
 type Engine struct {
@@ -51,7 +52,7 @@ func (re *Engine) ValidateOrder(order *domain.Order, account *domain.Account) er
 	// 1. Check if order would reduce or increase position
 	existingPos, hasPosition := account.Positions[order.Symbol]
 
-	var requiredMargin utils.Decimal
+	var requiredMargin decimal.Decimal
 	if hasPosition {
 		// Calculate margin impact
 		requiredMargin = re.calculateOrderMarginImpact(order, existingPos)
@@ -87,14 +88,14 @@ func (re *Engine) ValidateOrder(order *domain.Order, account *domain.Account) er
 }
 
 // calculateOrderMarginImpact determines margin change from an order
-func (re *Engine) calculateOrderMarginImpact(order *domain.Order, position *domain.Position) utils.Decimal {
+func (re *Engine) calculateOrderMarginImpact(order *domain.Order, position *domain.Position) decimal.Decimal {
 	// If order reduces position, it frees margin
 	isReducing := (position.Side == domain.SideBuy && order.Side == domain.SideSell) ||
 		(position.Side == domain.SideSell && order.Side == domain.SideBuy)
 
 	if isReducing {
-		reduceQty := utils.Min(order.Quantity, utils.Abs(position.Size))
-		freedMargin := (reduceQty / utils.Abs(position.Size)) * position.Margin
+		reduceQty := math.Min(order.Quantity, math.Abs(position.Size))
+		freedMargin := (reduceQty / math.Abs(position.Size)) * position.Margin
 		return -freedMargin // Negative because it frees margin
 	}
 
@@ -104,26 +105,26 @@ func (re *Engine) calculateOrderMarginImpact(order *domain.Order, position *doma
 }
 
 // CalculateMargin computes required margin for a position
-func (re *Engine) CalculateMargin(position *domain.Position) utils.Decimal {
-	notionalValue := utils.Abs(position.Size) * position.EntryPrice
+func (re *Engine) CalculateMargin(position *domain.Position) decimal.Decimal {
+	notionalValue := math.Abs(position.Size) * position.EntryPrice
 	return notionalValue / position.Leverage
 }
 
 // CalculateLiquidationPrice computes the price at which position is liquidated
-func (re *Engine) CalculateLiquidationPrice(position *domain.Position) utils.Decimal {
-	notionalValue := utils.Abs(position.Size) * position.EntryPrice
+func (re *Engine) CalculateLiquidationPrice(position *domain.Position) decimal.Decimal {
+	notionalValue := math.Abs(position.Size) * position.EntryPrice
 	maintenanceMargin := notionalValue * re.config.MaintenanceMarginRate
 
 	// Liquidation buffer = InitialMargin - MaintenanceMargin
 	liquidationBuffer := position.Margin - maintenanceMargin
 
-	var liqPrice utils.Decimal
+	var liqPrice decimal.Decimal
 	if position.Side == domain.SideBuy {
 		// Long: LiqPrice = Entry - (Buffer / Size)
-		liqPrice = position.EntryPrice - (liquidationBuffer / utils.Abs(position.Size))
+		liqPrice = position.EntryPrice - (liquidationBuffer / math.Abs(position.Size))
 	} else {
 		// Short: LiqPrice = Entry + (Buffer / Size)
-		liqPrice = position.EntryPrice + (liquidationBuffer / utils.Abs(position.Size))
+		liqPrice = position.EntryPrice + (liquidationBuffer / math.Abs(position.Size))
 	}
 
 	// Ensure liquidation price is positive
@@ -135,7 +136,7 @@ func (re *Engine) CalculateLiquidationPrice(position *domain.Position) utils.Dec
 }
 
 // CheckLiquidation determines if a position should be liquidated
-func (re *Engine) CheckLiquidation(position *domain.Position, markPrice utils.Decimal) bool {
+func (re *Engine) CheckLiquidation(position *domain.Position, markPrice decimal.Decimal) bool {
 	if position.Status != domain.PositionStatusOpen {
 		return false
 	}
@@ -152,14 +153,14 @@ func (re *Engine) CheckLiquidation(position *domain.Position, markPrice utils.De
 }
 
 // UpdatePositionMargin recalculates position metrics based on mark price
-func (re *Engine) UpdatePositionMargin(position *domain.Position, markPrice utils.Decimal) {
+func (re *Engine) UpdatePositionMargin(position *domain.Position, markPrice decimal.Decimal) {
 	position.MarkPrice = markPrice
 
 	// Calculate unrealized PnL
 	if position.Side == domain.SideBuy {
 		position.UnrealizedPnL = (markPrice - position.EntryPrice) * position.Size
 	} else {
-		position.UnrealizedPnL = (position.EntryPrice - markPrice) * utils.Abs(position.Size)
+		position.UnrealizedPnL = (position.EntryPrice - markPrice) * math.Abs(position.Size)
 	}
 
 	// Update liquidation price (may change with funding payments)

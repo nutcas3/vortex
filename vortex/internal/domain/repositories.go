@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+
 	"github.com/shopspring/decimal"
 )
 
@@ -26,7 +27,7 @@ type PositionRepository interface {
 
 // MarketDataProvider supplies real-time market data
 type MarketDataProvider interface {
-	GetMarkPrice(ctx context.Context, symbol string) (utils.Decimal, error)
-	GetIndexPrice(ctx context.Context, symbol string) (utils.Decimal, error)
-	SubscribePriceUpdates(symbol string) (<-chan utils.Decimal, error)
+	GetMarkPrice(ctx context.Context, symbol string) (decimal.Decimal, error)
+	GetIndexPrice(ctx context.Context, symbol string) (decimal.Decimal, error)
+	SubscribePriceUpdates(symbol string) (<-chan decimal.Decimal, error)
 }

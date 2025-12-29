@@ -4,7 +4,6 @@ import (
 	"sync"
 	"time"
 
-	"vortex/pkg/utils"
 	"github.com/shopspring/decimal"
 )
 
@@ -47,8 +46,8 @@ type Order struct {
 	Side        Side
 	Type        OrderType
 	Price       decimal.Decimal // For limit orders; 0 for market orders
-	Quantity    utils.Decimal
-	FilledQty   utils.Decimal
+	Quantity    decimal.Decimal
+	FilledQty   decimal.Decimal
 	Status      OrderStatus
 	Timestamp   time.Time
 	TimeInForce string // "GTC", "IOC", "FOK"
@@ -91,22 +90,22 @@ type Trade struct {
 
 type Account struct {
 	UserID          string
-	Balance         utils.Decimal // Collateral in USD
-	LockedBalance   utils.Decimal // Margin locked in positions
-	UnrealizedPnL   utils.Decimal
-	TotalEquity     utils.Decimal // Balance + UnrealizedPnL
-	AvailableMargin utils.Decimal
-	UsedMargin      utils.Decimal
+	Balance         decimal.Decimal // Collateral in USD
+	LockedBalance   decimal.Decimal // Margin locked in positions
+	UnrealizedPnL   decimal.Decimal
+	TotalEquity     decimal.Decimal // Balance + UnrealizedPnL
+	AvailableMargin decimal.Decimal
+	UsedMargin      decimal.Decimal
 	Positions       map[string]*Position // keyed by symbol
 	Mu              sync.RWMutex
 }
 
 type MarketData struct {
 	Symbol      string
-	LastPrice   utils.Decimal
-	MarkPrice   utils.Decimal // Fair price for margin calculations
-	IndexPrice  utils.Decimal // Spot price from index
-	FundingRate utils.Decimal
-	Volume24h   utils.Decimal
+	LastPrice   decimal.Decimal
+	MarkPrice   decimal.Decimal // Fair price for margin calculations
+	IndexPrice  decimal.Decimal // Spot price from index
+	FundingRate decimal.Decimal
+	Volume24h   decimal.Decimal
 	UpdatedAt   time.Time
 }

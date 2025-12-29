@@ -9,6 +9,7 @@ import (
 
 	"vortex/internal/domain"
 	"vortex/pkg/utils"
+
 	"github.com/shopspring/decimal"
 )
 
@@ -26,7 +27,7 @@ func NewMarkPriceCalculator(mdp domain.MarketDataProvider) *MarkPriceCalculator 
 
 // CalculateMarkPrice computes mark price using Fair Price Marking
 // Formula: MarkPrice = IndexPrice + EMA(Perpetual - Index)
-func (mpc *MarkPriceCalculator) CalculateMarkPrice(ctx context.Context, symbol string, lastPrice utils.Decimal) (utils.Decimal, error) {
+func (mpc *MarkPriceCalculator) CalculateMarkPrice(ctx context.Context, symbol string, lastPrice decimal.Decimal) (decimal.Decimal, error) {
 	indexPrice, err := mpc.marketDataProvider.GetIndexPrice(ctx, symbol)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get index price: %w", err)
@@ -68,18 +69,18 @@ func NewFundingRateCalculator(config Config, mdp domain.MarketDataProvider) *Fun
 
 // CalculateFundingRate computes the 8-hour funding rate
 // Formula: FundingRate = Premium_Index + clamp(Interest_Rate - Premium_Index, 0.05%, -0.05%)
-func (frc *FundingRateCalculator) CalculateFundingRate(ctx context.Context, symbol string, markPrice, indexPrice utils.Decimal) (utils.Decimal, error) {
+func (frc *FundingRateCalculator) CalculateFundingRate(ctx context.Context, symbol string, markPrice, indexPrice decimal.Decimal) (decimal.Decimal, error) {
 	// Premium Index = (MarkPrice - IndexPrice) / IndexPrice
 	premiumIndex := (markPrice - indexPrice) / indexPrice
 
 	// Interest Rate (typically small, e.g., 0.01% per 8 hours)
-	interestRate := utils.Decimal(0.0001)
+	interestRate := decimal.Decimal(0.0001)
 
 	// Calculate funding rate
 	fundingRate := premiumIndex + utils.Clamp(
 		interestRate-premiumIndex,
-		-utils.Decimal(0.0005), // -0.05%
-		utils.Decimal(0.0005),  // +0.05%
+		-decimal.Decimal(0.0005), // -0.05%
+		decimal.Decimal(0.0005),  // +0.05%
 	)
 
 	// Apply funding rate cap
@@ -91,7 +92,7 @@ func (frc *FundingRateCalculator) CalculateFundingRate(ctx context.Context, symb
 // ApplyFunding applies funding payment to a position
 // Positive funding rate: longs pay shorts
 // Negative funding rate: shorts pay longs
-func (frc *FundingRateCalculator) ApplyFunding(position *domain.Position, fundingRate utils.Decimal) utils.Decimal {
+func (frc *FundingRateCalculator) ApplyFunding(position *domain.Position, fundingRate decimal.Decimal) decimal.Decimal {
 	notionalValue := position.Size * position.MarkPrice
 	fundingPayment := notionalValue * fundingRate
 

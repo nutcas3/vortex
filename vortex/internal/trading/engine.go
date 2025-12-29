@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"vortex/internal/domain"
-	"vortex/pkg/utils"
+	"vortex/pkg/math"
 )
 
 // MatchingEngine executes orders against the order book
@@ -103,11 +103,11 @@ func (me *MatchingEngine) matchLimitOrder(order *domain.Order, book *OrderBook, 
 		// Match with orders at this price level (FIFO)
 		for len(topLevel.Orders) > 0 && order.FilledQty < order.Quantity {
 			makerOrder := topLevel.Orders[0]
-			matchQty := utils.Min(order.Quantity-order.FilledQty, makerOrder.Quantity-makerOrder.FilledQty)
+			matchQty := math.Min(order.Quantity-order.FilledQty, makerOrder.Quantity-makerOrder.FilledQty)
 
 			// Create trade
 			trade := &domain.Trade{
-				ID:           utils.GenerateID("trade"),
+				ID:           math.GenerateID("trade"),
 				Symbol:       order.Symbol,
 				Price:        makerOrder.Price, // Taker gets maker's price
 				Quantity:     matchQty,
@@ -180,10 +180,10 @@ func (me *MatchingEngine) matchMarketOrder(order *domain.Order, book *OrderBook,
 
 		for len(topLevel.Orders) > 0 && order.FilledQty < order.Quantity {
 			makerOrder := topLevel.Orders[0]
-			matchQty := utils.Min(order.Quantity-order.FilledQty, makerOrder.Quantity-makerOrder.FilledQty)
+			matchQty := math.Min(order.Quantity-order.FilledQty, makerOrder.Quantity-makerOrder.FilledQty)
 
 			trade := &domain.Trade{
-				ID:           utils.GenerateID("trade"),
+				ID:           math.GenerateID("trade"),
 				Symbol:       order.Symbol,
 				Price:        makerOrder.Price,
 				Quantity:     matchQty,
