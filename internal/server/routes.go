@@ -4,15 +4,26 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+
+	"vortex/internal/handlers"
+	"vortex/internal/server/routes"
 )
 
 func (s *Server) RegisterRoutes() http.Handler {
 	mux := http.NewServeMux()
 
-	// Register routes
+	// System endpoints
 	mux.HandleFunc("/", s.HelloWorldHandler)
-
 	mux.HandleFunc("/health", s.healthHandler)
+
+	// Initialize handlers
+	tradingHandler := handlers.NewTradingHandler()
+	marketDataHandler := handlers.NewMarketDataHandler()
+	accountHandler := handlers.NewAccountHandler()
+	riskHandler := handlers.NewRiskHandler()
+
+	// Register API routes
+	routes.APIRoutes(mux, tradingHandler, marketDataHandler, accountHandler, riskHandler)
 
 	// Wrap the mux with CORS middleware
 	return s.corsMiddleware(mux)
