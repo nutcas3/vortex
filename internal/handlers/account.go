@@ -44,8 +44,8 @@ func (h *AccountHandler) Account(w http.ResponseWriter, r *http.Request) {
 		"available_margin": account.AvailableMargin.String(),
 		"total_equity":     account.TotalEquity.String(),
 		"locked_balance":   account.LockedBalance.String(),
-		"created_at":       account.CreatedAt,
-		"updated_at":       account.UpdatedAt,
+		// "created_at":       account.CreatedAt, // Field doesn't exist in domain model
+		// "updated_at":       account.UpdatedAt, // Field doesn't exist in domain model
 	}
 
 	json.NewEncoder(w).Encode(response)
@@ -114,7 +114,7 @@ func (h *AccountHandler) createPosition(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// TODO: Get user ID from authentication context
-	userID := "user_123" // Placeholder
+	// userID := "user_123" // Placeholder
 
 	// TODO: Parse decimal values and create position
 	// This would typically be done through order execution rather than direct position creation

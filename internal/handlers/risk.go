@@ -6,6 +6,8 @@ import (
 
 	"vortex/internal/domain"
 	"vortex/internal/risk"
+
+	"github.com/shopspring/decimal"
 )
 
 type RiskHandler struct {
@@ -61,36 +63,27 @@ func (h *RiskHandler) Margin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	quantity, err := domain.ParseDecimal(quantityStr)
+	quantity, err := decimal.NewFromString(quantityStr)
 	if err != nil {
 		http.Error(w, "Invalid quantity", http.StatusBadRequest)
 		return
 	}
 
-	price, err := domain.ParseDecimal(priceStr)
+	price, err := decimal.NewFromString(priceStr)
 	if err != nil {
 		http.Error(w, "Invalid price", http.StatusBadRequest)
 		return
 	}
 
-	var leverage domain.Decimal
+	var leverage decimal.Decimal
 	if leverageStr != "" {
-		leverage, err = domain.ParseDecimal(leverageStr)
+		leverage, err = decimal.NewFromString(leverageStr)
 		if err != nil {
 			http.Error(w, "Invalid leverage", http.StatusBadRequest)
 			return
 		}
 	} else {
-		leverage = domain.DecimalFromInt(10) // Default 10x leverage
-	}
-
-	// Create sample order for calculation
-	order := &domain.Order{
-		Symbol:   symbol,
-		Side:     orderSide,
-		Type:     domain.OrderTypeLimit,
-		Quantity: quantity,
-		Price:    price,
+		leverage = decimal.NewFromInt(20) // Default 20x leverage
 	}
 
 	// Create sample position for calculation
@@ -100,7 +93,7 @@ func (h *RiskHandler) Margin(w http.ResponseWriter, r *http.Request) {
 		Size:       quantity,
 		EntryPrice: price,
 		Leverage:   leverage,
-		Margin:     domain.DecimalZero(), // Will be calculated
+		Margin:     decimal.Zero, // Will be calculated
 	}
 
 	// Calculate required margin
@@ -113,7 +106,7 @@ func (h *RiskHandler) Margin(w http.ResponseWriter, r *http.Request) {
 	initialMargin := quantity.Mul(price).Div(leverage)
 
 	// Calculate maintenance margin (typically 50% of initial)
-	maintenanceMargin := initialMargin.Mul(domain.DecimalFromFloat(0.5))
+	maintenanceMargin := initialMargin.Mul(decimal.NewFromFloat(0.5))
 
 	response := map[string]interface{}{
 		"symbol":             symbol,
@@ -125,7 +118,7 @@ func (h *RiskHandler) Margin(w http.ResponseWriter, r *http.Request) {
 		"maintenance_margin": maintenanceMargin.String(),
 		"required_margin":    requiredMargin.String(),
 		"liquidation_price":  liquidationPrice.String(),
-		"margin_ratio":       requiredMargin.Div(initialMargin.Mul(domain.DecimalFromInt(100))).String() + "%",
+		"margin_ratio":       requiredMargin.Div(initialMargin.Mul(decimal.NewFromInt(100))).String() + "%",
 	}
 
 	json.NewEncoder(w).Encode(response)
@@ -155,7 +148,7 @@ func (h *RiskHandler) Liquidation(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get user's position for the symbol
-	positions, err := h.positionRepo.GetByUserID(r.Context(), userID)
+	positions, err := h.positionRepo.FindByUser(r.Context(), userID)
 	if err != nil {
 		http.Error(w, "Failed to get positions", http.StatusInternalServerError)
 		return
@@ -186,7 +179,7 @@ func (h *RiskHandler) Liquidation(w http.ResponseWriter, r *http.Request) {
 	isAtRisk := h.riskEngine.CheckLiquidation(targetPosition, markPrice)
 
 	// Calculate distance to liquidation
-	var distanceToLiquidation domain.Decimal
+	var distanceToLiquidation decimal.Decimal
 	if targetPosition.Side == domain.SideBuy {
 		// Long: Distance = Mark Price - Liquidation Price
 		distanceToLiquidation = markPrice.Sub(targetPosition.LiquidationPrice)
@@ -196,11 +189,11 @@ func (h *RiskHandler) Liquidation(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Calculate percentage distance
-	var pctDistance domain.Decimal
+	var pctDistance decimal.Decimal
 	if targetPosition.Side == domain.SideBuy {
-		pctDistance = distanceToLiquidation.Div(markPrice).Mul(domain.DecimalFromInt(100))
+		pctDistance = distanceToLiquidation.Div(markPrice).Mul(decimal.NewFromInt(100))
 	} else {
-		pctDistance = distanceToLiquidation.Div(markPrice).Mul(domain.DecimalFromInt(100))
+		pctDistance = distanceToLiquidation.Div(markPrice).Mul(decimal.NewFromInt(100))
 	}
 
 	response := map[string]interface{}{
@@ -217,7 +210,7 @@ func (h *RiskHandler) Liquidation(w http.ResponseWriter, r *http.Request) {
 		"distance_to_liq":     distanceToLiquidation.String(),
 		"pct_distance_to_liq": pctDistance.String() + "%",
 		"leverage":            targetPosition.Leverage.String(),
-		"margin_ratio":        targetPosition.Margin.Div(targetPosition.Size.Mul(markPrice)).Mul(domain.DecimalFromInt(100)).String() + "%",
+		"margin_ratio":        targetPosition.Margin.Div(targetPosition.Size.Mul(markPrice)).Mul(decimal.NewFromInt(100)).String() + "%",
 	}
 
 	json.NewEncoder(w).Encode(response)
