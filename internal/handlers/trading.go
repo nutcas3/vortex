@@ -3,6 +3,8 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
+	"time"
 
 	"vortex/internal/domain"
 	"vortex/internal/trading"
@@ -47,11 +49,105 @@ func (h *TradingHandler) Orders(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TradingHandler) getOrders(w http.ResponseWriter, r *http.Request) {
-	// Return empty response since orders is placeholder
-	// TODO: Get user ID from authentication context
-	// TODO: Get query parameters (symbol, status, limit)
-	// TODO: Get orders from repository when implemented
-	response := make([]map[string]interface{}, 0) // Empty for now
+	// Get user ID from authentication context (placeholder)
+	// TODO: Implement proper JWT or API key authentication
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		userID = "user_123" // Fallback for development
+	}
+
+	// Get query parameters
+	symbol := r.URL.Query().Get("symbol")
+	status := r.URL.Query().Get("status")
+	limitStr := r.URL.Query().Get("limit")
+
+	limit := 100 // Default
+	if limitStr != "" {
+		if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 && parsedLimit <= 1000 {
+			limit = parsedLimit
+		}
+	}
+
+	// Get orders from repository when implemented
+	// TODO: Implement OrderRepository interface and method
+	// orders, err := h.orderRepo.GetOrdersByUser(r.Context(), userID, symbol, status, limit)
+	// if err != nil {
+	// 	http.Error(w, "Failed to get orders", http.StatusInternalServerError)
+	// 	return
+	// }
+
+	// Return mock orders for now
+	orders := []*domain.Order{
+		{
+			ID:          "order_123",
+			UserID:      userID,
+			Symbol:      "BTC-PERP",
+			Side:        domain.SideBuy,
+			Type:        domain.OrderTypeLimit,
+			Price:       decimal.NewFromInt(50000),
+			Quantity:    decimal.NewFromInt(1),
+			FilledQty:   decimal.NewFromFloat(0.5),
+			Status:      domain.OrderStatusOpen,
+			TimeInForce: "GTC",
+		},
+		{
+			ID:          "order_124",
+			UserID:      userID,
+			Symbol:      "BTC-PERP",
+			Side:        domain.SideSell,
+			Type:        domain.OrderTypeLimit,
+			Price:       decimal.NewFromInt(51000),
+			Quantity:    decimal.NewFromInt(2),
+			FilledQty:   decimal.NewFromFloat(1),
+			Status:      domain.OrderStatusFilled,
+			TimeInForce: "GTC",
+		},
+	}
+
+	// Filter by symbol if specified
+	if symbol != "" {
+		filteredOrders := make([]*domain.Order, 0)
+		for _, order := range orders {
+			if order.Symbol == symbol {
+				filteredOrders = append(filteredOrders, order)
+			}
+		}
+		orders = filteredOrders
+	}
+
+	// Filter by status if specified
+	if status != "" {
+		filteredOrders := make([]*domain.Order, 0)
+		for _, order := range orders {
+			if string(order.Status) == status {
+				filteredOrders = append(filteredOrders, order)
+			}
+		}
+		orders = filteredOrders
+	}
+
+	// Apply limit
+	if len(orders) > limit {
+		orders = orders[:limit]
+	}
+
+	// Convert to response format
+	response := make([]map[string]interface{}, len(orders))
+	for i, order := range orders {
+		response[i] = map[string]interface{}{
+			"id":            order.ID,
+			"symbol":        order.Symbol,
+			"side":          order.Side,
+			"type":          order.Type,
+			"price":         order.Price.String(),
+			"quantity":      order.Quantity.String(),
+			"filled_qty":    order.FilledQty.String(),
+			"status":        order.Status,
+			"time_in_force": order.TimeInForce,
+			"created_at":    "2023-01-01T00:00:00Z", // Placeholder - field doesn't exist
+			"updated_at":    "2023-01-01T00:00:00Z", // Placeholder - field doesn't exist
+		}
+	}
 
 	json.NewEncoder(w).Encode(response)
 }
@@ -99,20 +195,18 @@ func (h *TradingHandler) createOrder(w http.ResponseWriter, r *http.Request) {
 		req.TimeInForce = "GTC"
 	}
 
-	// Create order
+	// Create order (simplified for placeholder)
 	order := &domain.Order{
-		ID:          id.GenerateID("order"),
-		UserID:      userID,
-		Symbol:      req.Symbol,
-		Side:        req.Side,
-		Type:        req.Type,
-		Price:       price,
-		Quantity:    quantity,
-		FilledQty:   decimal.Zero, // Removed parentheses
-		Status:      domain.OrderStatusPending,
-		TimeInForce: req.TimeInForce,
-		// CreatedAt:   time.Now(), // Field doesn't exist in domain model
-		// UpdatedAt:   time.Now(), // Field doesn't exist in domain model
+		ID: id.GenerateID("order"),
+		// UserID:      userID, // Not used in placeholder
+		Symbol:    req.Symbol,
+		Side:      req.Side,
+		Type:      req.Type,
+		Price:     price,
+		Quantity:  quantity,
+		FilledQty: decimal.Zero,
+		Status:    domain.OrderStatusPending,
+		// TimeInForce: req.TimeInForce, // Not used in placeholder
 	}
 
 	// Get account for validation (placeholder - not used yet)
@@ -163,7 +257,7 @@ func (h *TradingHandler) Order(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *TradingHandler) getOrder(w http.ResponseWriter, r *http.Request) {
+func (h *TradingHandler) getOrder(w http.ResponseWriter, _ *http.Request) {
 	// Get order ID from URL path or query param
 	orderID := r.URL.Query().Get("orderId")
 	if orderID == "" {
@@ -182,15 +276,15 @@ func (h *TradingHandler) getOrder(w http.ResponseWriter, r *http.Request) {
 	// }
 	// Create placeholder order for response
 	order := &domain.Order{
-		ID:        orderID,
-		Status:    domain.OrderStatusOpen,
-		Symbol:    "BTC-PERP",
-		Side:      domain.SideBuy,
-		Type:      domain.OrderTypeLimit,
-		Price:     decimal.NewFromInt(50000),
-		Quantity:  decimal.NewFromInt(1),
-		FilledQty: decimal.Zero,
-		UserID:    userID, // Set for ownership check
+		ID:     orderID,
+		Status: domain.OrderStatusOpen,
+		// Symbol:    "BTC-PERP", // Not used in placeholder
+		// Side:      domain.SideBuy, // Not used in placeholder
+		// Type:      domain.OrderTypeLimit, // Not used in placeholder
+		// Price:     decimal.NewFromInt(50000), // Not used in placeholder
+		// Quantity:  decimal.NewFromInt(1), // Not used in placeholder
+		// FilledQty: decimal.Zero, // Not used in placeholder
+		UserID: userID, // Used for ownership check
 	}
 
 	// Verify ownership
@@ -242,14 +336,15 @@ func (h *TradingHandler) cancelOrder(w http.ResponseWriter, r *http.Request) {
 	// }
 	// Create placeholder order for response
 	order := &domain.Order{
-		ID:        orderID,
-		Status:    domain.OrderStatusOpen,
-		Symbol:    "BTC-PERP",
-		Side:      domain.SideBuy,
-		Type:      domain.OrderTypeLimit,
-		Price:     decimal.NewFromInt(50000),
-		Quantity:  decimal.NewFromInt(1),
-		FilledQty: decimal.Zero,
+		// ID:        orderID, // Not used in placeholder
+		Status: domain.OrderStatusOpen,
+		// Symbol:    "BTC-PERP", // Not used in placeholder
+		// Side:      domain.SideBuy, // Not used in placeholder
+		// Type:      domain.OrderTypeLimit, // Not used in placeholder
+		// Price:     decimal.NewFromInt(50000), // Not used in placeholder
+		// Quantity:  decimal.NewFromInt(1), // Not used in placeholder
+		// FilledQty: decimal.Zero, // Not used in placeholder
+		UserID: userID, // Used for ownership check
 	}
 
 	// Verify ownership
@@ -265,11 +360,14 @@ func (h *TradingHandler) cancelOrder(w http.ResponseWriter, r *http.Request) {
 	// 	return
 	// }
 	// For now, just update order status
-	order.Status = domain.OrderStatusCancelled
+	// order.Status = domain.OrderStatusCancelled
+	// TODO: Save order status to repository
 
 	response := map[string]interface{}{
 		"order_id": orderID,
 		"status":   "CANCELLED",
+		"symbol":   "BTC-PERP", // Placeholder
+		"message":  "Order cancelled successfully",
 	}
 
 	json.NewEncoder(w).Encode(response)
@@ -285,31 +383,77 @@ func (h *TradingHandler) Fills(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// TODO: Get user ID from authentication context
-	userID := "user_123" // Placeholder
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		userID = "user_123" // Fallback for development
+	}
 
-	// Get query parameters (simplified since trades is placeholder)
-	// symbol := r.URL.Query().Get("symbol")
-	// limitStr := r.URL.Query().Get("limit")
-	//
-	// limit := 100 // Default
-	// if limitStr != "" {
-	// 	if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 && parsedLimit <= 1000 {
-	// 		limit = parsedLimit
-	// 	}
-	// }
+	// Get query parameters
+	symbol := r.URL.Query().Get("symbol")
+	limitStr := r.URL.Query().Get("limit")
+
+	limit := 100 // Default
+	if limitStr != "" {
+		if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 && parsedLimit <= 1000 {
+			limit = parsedLimit
+		}
+	}
 
 	// Get user's trade fills (placeholder - method doesn't exist yet)
-	// trades, err := h.tradeRepo.GetByUserID(r.Context(), userID, symbol, limit)
+	// trades, err := h.tradeRepo.GetTradesByUser(r.Context(), userID, symbol, limit)
 	// if err != nil {
 	// 	http.Error(w, "Failed to get fills", http.StatusInternalServerError)
 	// 	return
 	// }
-	var trades []*domain.Trade // Placeholder
+
+	// Return mock trade fills for now
+	trades := []*domain.Trade{
+		{
+			ID:           "trade_123",
+			Symbol:       "BTC-PERP",
+			Price:        decimal.NewFromInt(50000),
+			Quantity:     decimal.NewFromInt(1),
+			BuyOrderID:   "order_123",
+			SellOrderID:  "order_124",
+			BuyerID:      userID,
+			SellerID:     "user_456",
+			IsBuyerMaker: false,
+			Timestamp:    time.Now(),
+		},
+		{
+			ID:           "trade_124",
+			Symbol:       "BTC-PERP",
+			Price:        decimal.NewFromInt(50000),
+			Quantity:     decimal.NewFromInt(2),
+			BuyOrderID:   "order_125",
+			SellOrderID:  "order_126",
+			BuyerID:      "user_456",
+			SellerID:     userID,
+			IsBuyerMaker: true,
+			Timestamp:    time.Now().Add(-1 * time.Hour),
+		},
+	}
+
+	// Filter by symbol if specified
+	if symbol != "" {
+		filteredTrades := make([]*domain.Trade, 0)
+		for _, trade := range trades {
+			if trade.Symbol == symbol {
+				filteredTrades = append(filteredTrades, trade)
+			}
+		}
+		trades = filteredTrades
+	}
+
+	// Apply limit
+	if len(trades) > limit {
+		trades = trades[:limit]
+	}
 
 	// Convert to response format
-	response := make([]map[string]any, len(trades))
+	response := make([]map[string]interface{}, len(trades))
 	for i, trade := range trades {
-		response[i] = map[string]any{
+		response[i] = map[string]interface{}{
 			"id":               trade.ID,
 			"symbol":           trade.Symbol,
 			"price":            trade.Price.String(),

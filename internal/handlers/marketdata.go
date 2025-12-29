@@ -90,6 +90,12 @@ func (h *MarketDataHandler) Ticker24hr(w http.ResponseWriter, r *http.Request) {
 		if firstPrice.GreaterThan(decimal.Zero) {
 			priceChangePct = priceChange.Div(firstPrice).Mul(decimal.NewFromInt(100))
 		}
+	} else {
+		// Set default values when no trades available
+		lastPrice = decimal.NewFromInt(50000)
+		firstPrice = decimal.NewFromInt(50000)
+		highPrice = decimal.NewFromInt(50000)
+		lowPrice = decimal.NewFromInt(50000)
 	}
 
 	// Get current order book depth
