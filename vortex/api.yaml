@@ -1,0 +1,751 @@
+openapi: 3.0.3
+info:
+  title: Vortex - Perpetual Futures Trading API
+  description: |
+    High-throughput derivatives trading platform with perpetual swaps.
+    
+    ## Features
+    - **Real-time Order Matching**: Price-time priority matching engine
+    - **Perpetual Swaps**: Funding rate mechanism and mark price calculation
+    - **Risk Management**: Automated liquidation and margin monitoring
+    - **WebSocket Feeds**: Real-time market data and order updates
+    
+    ## Authentication
+    All endpoints require HMAC-SHA256 signature authentication.
+    Include the following headers:
+    - `X-API-KEY`: Your API key
+    - `X-SIGNATURE`: HMAC signature of request
+    - `X-TIMESTAMP`: Request timestamp (Unix milliseconds)
+    
+  version: 1.0.0
+  contact:
+    name: Vortex API Support
+    email: api@vortex.exchange
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.vortex.exchange/v1
+    description: Production
+  - url: https://testnet.vortex.exchange/v1
+    description: Testnet
+
+tags:
+  - name: Trading
+    description: Order placement and management
+  - name: Account
+    description: Account and balance operations
+  - name: Positions
+    description: Position management and monitoring
+  - name: Market Data
+    description: Public market information
+
+paths:
+  /order:
+    post:
+      tags:
+        - Trading
+      summary: Place a new order
+      description: Submit a limit or market order
+      operationId: placeOrder
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewOrderRequest'
+            examples:
+              limitBuy:
+                summary: Limit buy order
+                value:
+                  symbol: "BTC-PERP"
+                  side: "BUY"
+                  type: "LIMIT"
+                  price: 45000.00
+                  quantity: 2.5
+                  timeInForce: "GTC"
+                  reduceOnly: false
+              marketSell:
+                summary: Market sell order
+                value:
+                  symbol: "BTC-PERP"
+                  side: "SELL"
+                  type: "MARKET"
+                  quantity: 1.0
+                  timeInForce: "IOC"
+                  reduceOnly: true
+      responses:
+        '201':
+          description: Order placed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+  /order/{orderId}:
+    get:
+      tags:
+        - Trading
+      summary: Get order details
+      operationId: getOrder
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "order_1234567890"
+      responses:
+        '200':
+          description: Order details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - Trading
+      summary: Cancel an order
+      operationId: cancelOrder
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Order cancelled successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /orders:
+    get:
+      tags:
+        - Trading
+      summary: Get open orders
+      operationId: getOpenOrders
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: symbol
+          in: query
+          schema:
+            type: string
+          description: Filter by symbol
+          example: "BTC-PERP"
+      responses:
+        '200':
+          description: List of open orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrderResponse'
+
+  /account:
+    get:
+      tags:
+        - Account
+      summary: Get account information
+      operationId: getAccount
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Account details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountResponse'
+
+  /account/balance:
+    get:
+      tags:
+        - Account
+      summary: Get account balance
+      operationId: getBalance
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Balance information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceResponse'
+
+  /positions:
+    get:
+      tags:
+        - Positions
+      summary: Get all open positions
+      operationId: getPositions
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: symbol
+          in: query
+          schema:
+            type: string
+          description: Filter by symbol
+      responses:
+        '200':
+          description: List of positions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PositionResponse'
+
+  /position/{symbol}:
+    get:
+      tags:
+        - Positions
+      summary: Get position for a symbol
+      operationId: getPosition
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "BTC-PERP"
+      responses:
+        '200':
+          description: Position details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PositionResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /position/{symbol}/leverage:
+    put:
+      tags:
+        - Positions
+      summary: Update position leverage
+      operationId: updateLeverage
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - leverage
+              properties:
+                leverage:
+                  type: number
+                  format: float
+                  minimum: 1
+                  maximum: 100
+                  example: 10
+      responses:
+        '200':
+          description: Leverage updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PositionResponse'
+
+  /trades:
+    get:
+      tags:
+        - Trading
+      summary: Get trade history
+      operationId: getTrades
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: symbol
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 500
+        - name: startTime
+          in: query
+          schema:
+            type: integer
+            format: int64
+          description: Unix timestamp in milliseconds
+      responses:
+        '200':
+          description: Trade history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TradeResponse'
+
+  /market/{symbol}/orderbook:
+    get:
+      tags:
+        - Market Data
+      summary: Get order book
+      operationId: getOrderBook
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: depth
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: Order book snapshot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderBookResponse'
+
+  /market/{symbol}/ticker:
+    get:
+      tags:
+        - Market Data
+      summary: Get market ticker
+      operationId: getTicker
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Market ticker
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TickerResponse'
+
+  /market/{symbol}/fundingRate:
+    get:
+      tags:
+        - Market Data
+      summary: Get current funding rate
+      operationId: getFundingRate
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Funding rate information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FundingRateResponse'
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-KEY
+      description: |
+        API key authentication with HMAC-SHA256 signature.
+        Include X-SIGNATURE and X-TIMESTAMP headers.
+
+  schemas:
+    NewOrderRequest:
+      type: object
+      required:
+        - symbol
+        - side
+        - type
+        - quantity
+      properties:
+        symbol:
+          type: string
+          example: "BTC-PERP"
+        side:
+          type: string
+          enum: [BUY, SELL]
+        type:
+          type: string
+          enum: [LIMIT, MARKET]
+        price:
+          type: number
+          format: float
+          description: Required for LIMIT orders
+          example: 45000.00
+        quantity:
+          type: number
+          format: float
+          minimum: 0.001
+          example: 2.5
+        timeInForce:
+          type: string
+          enum: [GTC, IOC, FOK]
+          default: GTC
+          description: |
+            - GTC: Good Till Cancel
+            - IOC: Immediate Or Cancel
+            - FOK: Fill Or Kill
+        reduceOnly:
+          type: boolean
+          default: false
+          description: Only reduce position size
+        postOnly:
+          type: boolean
+          default: false
+          description: Only add liquidity (maker only)
+        clientOrderId:
+          type: string
+          description: Client-specified order ID
+
+    OrderResponse:
+      type: object
+      properties:
+        orderId:
+          type: string
+          example: "order_1234567890"
+        clientOrderId:
+          type: string
+        symbol:
+          type: string
+        side:
+          type: string
+          enum: [BUY, SELL]
+        type:
+          type: string
+          enum: [LIMIT, MARKET]
+        price:
+          type: number
+          format: float
+        quantity:
+          type: number
+          format: float
+        filledQty:
+          type: number
+          format: float
+        status:
+          type: string
+          enum: [PENDING, OPEN, FILLED, CANCELLED, REJECTED]
+        timestamp:
+          type: integer
+          format: int64
+        updateTime:
+          type: integer
+          format: int64
+
+    AccountResponse:
+      type: object
+      properties:
+        userId:
+          type: string
+        balance:
+          type: number
+          format: float
+          description: Total collateral in USD
+        lockedBalance:
+          type: number
+          format: float
+          description: Margin locked in positions
+        availableMargin:
+          type: number
+          format: float
+        unrealizedPnL:
+          type: number
+          format: float
+        totalEquity:
+          type: number
+          format: float
+          description: Balance + Unrealized PnL
+        marginRatio:
+          type: number
+          format: float
+          description: Used margin / Total equity
+
+    BalanceResponse:
+      type: object
+      properties:
+        asset:
+          type: string
+          example: "USDT"
+        free:
+          type: number
+          format: float
+        locked:
+          type: number
+          format: float
+        total:
+          type: number
+          format: float
+
+    PositionResponse:
+      type: object
+      properties:
+        positionId:
+          type: string
+        symbol:
+          type: string
+        side:
+          type: string
+          enum: [BUY, SELL]
+        size:
+          type: number
+          format: float
+        entryPrice:
+          type: number
+          format: float
+        markPrice:
+          type: number
+          format: float
+        liquidationPrice:
+          type: number
+          format: float
+        leverage:
+          type: number
+          format: float
+        margin:
+          type: number
+          format: float
+        unrealizedPnL:
+          type: number
+          format: float
+        realizedPnL:
+          type: number
+          format: float
+        marginRatio:
+          type: number
+          format: float
+          description: Maintenance margin / Position margin
+        status:
+          type: string
+          enum: [OPEN, LIQUIDATED, CLOSED]
+        createdAt:
+          type: integer
+          format: int64
+        updatedAt:
+          type: integer
+          format: int64
+
+    TradeResponse:
+      type: object
+      properties:
+        tradeId:
+          type: string
+        symbol:
+          type: string
+        orderId:
+          type: string
+        price:
+          type: number
+          format: float
+        quantity:
+          type: number
+          format: float
+        side:
+          type: string
+          enum: [BUY, SELL]
+        fee:
+          type: number
+          format: float
+        feeAsset:
+          type: string
+        isMaker:
+          type: boolean
+        timestamp:
+          type: integer
+          format: int64
+
+    OrderBookResponse:
+      type: object
+      properties:
+        symbol:
+          type: string
+        timestamp:
+          type: integer
+          format: int64
+        bids:
+          type: array
+          items:
+            type: array
+            items:
+              type: number
+              format: float
+            minItems: 2
+            maxItems: 2
+            example: [45000.00, 2.5]
+        asks:
+          type: array
+          items:
+            type: array
+            items:
+              type: number
+              format: float
+            minItems: 2
+            maxItems: 2
+            example: [45100.00, 1.8]
+
+    TickerResponse:
+      type: object
+      properties:
+        symbol:
+          type: string
+        lastPrice:
+          type: number
+          format: float
+        markPrice:
+          type: number
+          format: float
+        indexPrice:
+          type: number
+          format: float
+        fundingRate:
+          type: number
+          format: float
+        volume24h:
+          type: number
+          format: float
+        high24h:
+          type: number
+          format: float
+        low24h:
+          type: number
+          format: float
+        priceChange24h:
+          type: number
+          format: float
+        priceChangePercent24h:
+          type: number
+          format: float
+        timestamp:
+          type: integer
+          format: int64
+
+    FundingRateResponse:
+      type: object
+      properties:
+        symbol:
+          type: string
+        fundingRate:
+          type: number
+          format: float
+          example: 0.0001
+        fundingTime:
+          type: integer
+          format: int64
+          description: Next funding timestamp
+        estimatedRate:
+          type: number
+          format: float
+          description: Estimated rate for next interval
+
+    Error:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: "Insufficient margin"
+        details:
+          type: object
+          additionalProperties: true
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: 400
+            message: "Invalid order quantity"
+            
+    Unauthorized:
+      description: Authentication failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: 401
+            message: "Invalid API key or signature"
+            
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: 404
+            message: "Order not found"
+            
+    RateLimitExceeded:
+      description: Too many requests
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: 429
+            message: "Rate limit exceeded"
+      headers:
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+          description: Request limit per interval
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+          description: Remaining requests
+        X-RateLimit-Reset:
+          schema:
+            type: integer
+          description: Reset timestamp
