@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"context"
+
 	"github.com/shopspring/decimal"
 )
 
@@ -11,4 +13,13 @@ type RiskEngine interface {
 	CalculateLiquidationPrice(position *Position) decimal.Decimal
 	CheckLiquidation(position *Position, markPrice decimal.Decimal) bool
 	UpdatePositionMargin(position *Position, markPrice decimal.Decimal)
+}
+
+// OrderRepository defines the interface for order management
+type OrderRepository interface {
+	Create(ctx context.Context, order *Order) error
+	GetByID(ctx context.Context, orderID string) (*Order, error)
+	GetOrdersByUser(ctx context.Context, userID, symbol, status string, limit int) ([]*Order, error)
+	Update(ctx context.Context, order *Order) error
+	Delete(ctx context.Context, orderID string) error
 }
