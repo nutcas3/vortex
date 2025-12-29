@@ -48,49 +48,11 @@ func (h *MarketDataHandler) Ticker24hr(w http.ResponseWriter, r *http.Request) {
 	// Get 24h ago timestamp
 	twentyFourHoursAgo := time.Now().Add(-24 * time.Hour)
 
-	// Get recent trades for statistics (mock data for now)
-	// TODO: Replace with actual repository call when implemented
-	var trades []*domain.Trade
-
-	// Create mock trades for demonstration
-	now := time.Now()
-	trades = []*domain.Trade{
-		{
-			ID:           "trade_1",
-			Symbol:       symbol,
-			Price:        decimal.NewFromInt(50000),
-			Quantity:     decimal.NewFromInt(1),
-			BuyOrderID:   "order_1",
-			SellOrderID:  "order_2",
-			BuyerID:      "user_1",
-			SellerID:     "user_2",
-			IsBuyerMaker: false,
-			Timestamp:    now.Add(-2 * time.Hour),
-		},
-		{
-			ID:           "trade_2",
-			Symbol:       symbol,
-			Price:        decimal.NewFromInt(50100),
-			Quantity:     decimal.NewFromInt(0.5),
-			BuyOrderID:   "order_3",
-			SellOrderID:  "order_4",
-			BuyerID:      "user_3",
-			SellerID:     "user_1",
-			IsBuyerMaker: true,
-			Timestamp:    now.Add(-1 * time.Hour),
-		},
-		{
-			ID:           "trade_3",
-			Symbol:       symbol,
-			Price:        decimal.NewFromInt(49900),
-			Quantity:     decimal.NewFromInt(2),
-			BuyOrderID:   "order_5",
-			SellOrderID:  "order_6",
-			BuyerID:      "user_2",
-			SellerID:     "user_4",
-			IsBuyerMaker: false,
-			Timestamp:    now,
-		},
+	// Get recent trades for statistics
+	trades, err := h.tradeRepo.GetTradesSince(r.Context(), symbol, twentyFourHoursAgo)
+	if err != nil {
+		http.Error(w, "Failed to get trade data", http.StatusInternalServerError)
+		return
 	}
 
 	// Calculate 24h statistics
