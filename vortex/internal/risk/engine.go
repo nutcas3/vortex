@@ -60,7 +60,7 @@ func (re *Engine) ValidateOrder(order *domain.Order, account *domain.Account) er
 	} else {
 		// New position: calculate initial margin
 		notionalValue := order.Quantity.Mul(order.Price)
-		requiredMargin = notionalValue / re.config.MaxLeverage
+		requiredMargin = notionalValue.Div(re.config.MaxLeverage)
 	}
 
 	// 2. Check available margin
@@ -97,18 +97,18 @@ func (re *Engine) calculateOrderMarginImpact(order *domain.Order, position *doma
 	if isReducing {
 		reduceQty := math.Min(order.Quantity, math.Abs(position.Size))
 		freedMargin := reduceQty.Div(math.Abs(position.Size)).Mul(position.Margin)
-		return -freedMargin // Negative because it frees margin
+		return freedMargin.Neg() // Negative because it frees margin
 	}
 
 	// Order increases position
 	notionalValue := order.Quantity.Mul(order.Price)
-	return notionalValue / position.Leverage
+	return notionalValue.Div(position.Leverage)
 }
 
 // CalculateMargin computes required margin for a position
 func (re *Engine) CalculateMargin(position *domain.Position) decimal.Decimal {
 	notionalValue := math.Abs(position.Size).Mul(position.EntryPrice)
-	return notionalValue / position.Leverage
+	return notionalValue.Div(position.Leverage)
 }
 
 // CalculateLiquidationPrice computes the price at which position is liquidated
@@ -117,7 +117,7 @@ func (re *Engine) CalculateLiquidationPrice(position *domain.Position) decimal.D
 	maintenanceMargin := notionalValue.Mul(re.config.MaintenanceMarginRate)
 
 	// Liquidation buffer = InitialMargin - MaintenanceMargin
-	liquidationBuffer := position.Margin - maintenanceMargin
+	liquidationBuffer := position.Margin.Sub(maintenanceMargin)
 
 	var liqPrice decimal.Decimal
 	if position.Side == domain.SideBuy {

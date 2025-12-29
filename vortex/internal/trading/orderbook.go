@@ -115,7 +115,7 @@ func (ob *OrderBook) AddOrder(order *domain.Order) error {
 		level = &PriceLevel{
 			Price:  order.Price,
 			Orders: make([]*domain.Order, 0),
-			Volume: 0,
+			Volume: math.Zero,
 		}
 		heap.Push(side, level)
 	}
@@ -203,8 +203,8 @@ func (ob *OrderBook) GetTopLevels(side *OrderBookSide, depth int) [][]float64 {
 	for i := 0; i < side.Len() && i < depth; i++ {
 		level := side.levels[i]
 		result = append(result, []float64{
-			float64(level.Price),
-			float64(level.Volume),
+			level.Price.InexactFloat64(),
+			level.Volume.InexactFloat64(),
 		})
 	}
 	return result

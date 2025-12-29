@@ -78,13 +78,13 @@ func (frc *FundingRateCalculator) CalculateFundingRate(ctx context.Context, symb
 
 	// Calculate funding rate
 	fundingRate := premiumIndex.Add(math.Clamp(
-		interestRate-premiumIndex,
+		interestRate.Sub(premiumIndex),
 		decimal.NewFromFloat(-0.0005), // -0.05%
-		decimal.Decimal(0.0005),  // +0.05%
-	),
+		decimal.NewFromFloat(0.0005)  // +0.05%
+	))
 
 	// Apply funding rate cap
-	fundingRate == math.Clamp(fundingRate, -frc.config.FundingRateCap, frc.config.FundingRateCap)
+	fundingRate = math.Clamp(fundingRate, frc.config.FundingRateCap.Neg(), frc.config.FundingRateCap)
 
 	return fundingRate, nil
 }

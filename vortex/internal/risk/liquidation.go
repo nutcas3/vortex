@@ -178,9 +178,9 @@ func (le *LiquidationEngine) liquidatePosition(position *domain.Position) error 
 	for _, trade := range trades {
 		pnl := trade.Price.Sub(position.EntryPrice).Mul(trade.Quantity)
 		if position.Side == domain.SideSell {
-			pnl = -pnl
+			pnl = pnl.Neg()
 		}
-		totalPnL += pnl
+		totalPnL = totalPnL.Add(pnl)
 	}
 	position.RealizedPnL = position.RealizedPnL.Add(totalPnL)
 
