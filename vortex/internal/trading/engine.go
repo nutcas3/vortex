@@ -73,7 +73,7 @@ func (me *MatchingEngine) SubmitOrder(ctx context.Context, order *domain.Order, 
 }
 
 // matchLimitOrder matches a limit order against the book
-func (me *MatchingEngine) matchLimitOrder(order *domain.Order, book *OrderBook, account *domain.Account) []*domain.Trade {
+func (me *MatchingEngine) matchLimitOrder(order *domain.Order, book *OrderBook, _ *domain.Account) []*domain.Trade {
 	trades := make([]*domain.Trade, 0)
 
 	book.mu.Lock()
@@ -165,7 +165,7 @@ func (me *MatchingEngine) matchLimitOrder(order *domain.Order, book *OrderBook, 
 }
 
 // matchMarketOrder matches a market order (always takes liquidity)
-func (me *MatchingEngine) matchMarketOrder(order *domain.Order, book *OrderBook, account *domain.Account) []*domain.Trade {
+func (me *MatchingEngine) matchMarketOrder(order *domain.Order, book *OrderBook, _ *domain.Account) []*domain.Trade {
 	trades := make([]*domain.Trade, 0)
 
 	book.mu.Lock()
