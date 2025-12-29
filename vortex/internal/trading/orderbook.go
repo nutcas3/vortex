@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"vortex/internal/domain"
+	"vortex/pkg/math"
 
 	"github.com/shopspring/decimal"
 )
@@ -29,9 +30,9 @@ func (obs *OrderBookSide) Len() int { return len(obs.levels) }
 
 func (obs *OrderBookSide) Less(i, j int) bool {
 	if obs.isAsk {
-		return obs.levels[i].Price < obs.levels[j].Price // min-heap for asks
+		return obs.levels[i].Price.LessThan(obs.levels[j].Price) // min-heap for asks
 	}
-	return obs.levels[i].Price > obs.levels[j].Price // max-heap for bids
+	return obs.levels[i].Price.GreaterThan(obs.levels[j].Price) // max-heap for bids
 }
 
 func (obs *OrderBookSide) Swap(i, j int) {
@@ -120,7 +121,7 @@ func (ob *OrderBook) AddOrder(order *domain.Order) error {
 	}
 
 	level.Orders = append(level.Orders, order)
-	level.Volume += order.Quantity - order.FilledQty
+	level.Volume = level.Volume.Add(order.Quantity.Sub(order.FilledQty))
 
 	return nil
 }
@@ -149,7 +150,7 @@ func (ob *OrderBook) RemoveOrder(orderID string) error {
 	for i, o := range level.Orders {
 		if o.ID == orderID {
 			level.Orders = append(level.Orders[:i], level.Orders[i+1:]...)
-			level.Volume -= order.Quantity - order.FilledQty
+			level.Volume = level.Volume.Sub(order.Quantity.Sub(order.FilledQty))
 			break
 		}
 	}
@@ -169,7 +170,7 @@ func (ob *OrderBook) GetBestBid() (decimal.Decimal, bool) {
 	defer ob.mu.RUnlock()
 
 	if ob.Bids.Len() == 0 {
-		return 0, false
+		return math.Zero, false
 	}
 	return ob.Bids.levels[0].Price, true
 }
@@ -180,7 +181,7 @@ func (ob *OrderBook) GetBestAsk() (decimal.Decimal, bool) {
 	defer ob.mu.RUnlock()
 
 	if ob.Asks.Len() == 0 {
-		return 0, false
+		return math.Zero, false
 	}
 	return ob.Asks.levels[0].Price, true
 }
@@ -191,9 +192,9 @@ func (ob *OrderBook) GetSpread() decimal.Decimal {
 	ask, askExists := ob.GetBestAsk()
 
 	if !bidExists || !askExists {
-		return 0
+		return math.Zero
 	}
-	return ask - bid
+	return ask.Sub(bid)
 }
 
 // GetTopLevels returns the top N price levels

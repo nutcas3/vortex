@@ -1,13 +1,14 @@
 package risk
 
 import (
-	"fmt"	
+	"fmt"
 	"time"
 
 	"vortex/internal/domain"
 
-	"github.com/shopspring/decimal"
 	"vortex/pkg/math"
+
+	"github.com/shopspring/decimal"
 )
 
 type Config struct {
@@ -58,12 +59,12 @@ func (re *Engine) ValidateOrder(order *domain.Order, account *domain.Account) er
 		requiredMargin = re.calculateOrderMarginImpact(order, existingPos)
 	} else {
 		// New position: calculate initial margin
-		notionalValue := order.Quantity * order.Price
+		notionalValue := order.Quantity.Mul(order.Price)
 		requiredMargin = notionalValue / re.config.MaxLeverage
 	}
 
 	// 2. Check available margin
-	if requiredMargin > account.AvailableMargin {
+	if requiredMargin.GreaterThan(account.AvailableMargin) {
 		return fmt.Errorf("insufficient margin: need %.2f, have %.2f",
 			requiredMargin, account.AvailableMargin)
 	}
@@ -72,13 +73,13 @@ func (re *Engine) ValidateOrder(order *domain.Order, account *domain.Account) er
 	if hasPosition {
 		newSize := existingPos.Size
 		if order.Side == domain.SideBuy {
-			newSize += order.Quantity
+			newSize = newSize.Add(order.Quantity)
 		} else {
-			newSize -= order.Quantity
+			newSize = newSize.Sub(order.Quantity)
 		}
 
-		effectiveLeverage := (newSize * order.Price) / account.TotalEquity
-		if effectiveLeverage > re.config.MaxLeverage {
+		effectiveLeverage := newSize.Mul(order.Price).Div(account.TotalEquity)
+		if effectiveLeverage.GreaterThan(re.config.MaxLeverage) {
 			return fmt.Errorf("leverage %.2fx exceeds maximum %.2fx",
 				effectiveLeverage, re.config.MaxLeverage)
 		}
@@ -95,25 +96,25 @@ func (re *Engine) calculateOrderMarginImpact(order *domain.Order, position *doma
 
 	if isReducing {
 		reduceQty := math.Min(order.Quantity, math.Abs(position.Size))
-		freedMargin := (reduceQty / math.Abs(position.Size)) * position.Margin
+		freedMargin := reduceQty.Div(math.Abs(position.Size)).Mul(position.Margin)
 		return -freedMargin // Negative because it frees margin
 	}
 
 	// Order increases position
-	notionalValue := order.Quantity * order.Price
+	notionalValue := order.Quantity.Mul(order.Price)
 	return notionalValue / position.Leverage
 }
 
 // CalculateMargin computes required margin for a position
 func (re *Engine) CalculateMargin(position *domain.Position) decimal.Decimal {
-	notionalValue := math.Abs(position.Size) * position.EntryPrice
+	notionalValue := math.Abs(position.Size).Mul(position.EntryPrice)
 	return notionalValue / position.Leverage
 }
 
 // CalculateLiquidationPrice computes the price at which position is liquidated
 func (re *Engine) CalculateLiquidationPrice(position *domain.Position) decimal.Decimal {
-	notionalValue := math.Abs(position.Size) * position.EntryPrice
-	maintenanceMargin := notionalValue * re.config.MaintenanceMarginRate
+	notionalValue := math.Abs(position.Size).Mul(position.EntryPrice)
+	maintenanceMargin := notionalValue.Mul(re.config.MaintenanceMarginRate)
 
 	// Liquidation buffer = InitialMargin - MaintenanceMargin
 	liquidationBuffer := position.Margin - maintenanceMargin
@@ -121,15 +122,15 @@ func (re *Engine) CalculateLiquidationPrice(position *domain.Position) decimal.D
 	var liqPrice decimal.Decimal
 	if position.Side == domain.SideBuy {
 		// Long: LiqPrice = Entry - (Buffer / Size)
-		liqPrice = position.EntryPrice - (liquidationBuffer / math.Abs(position.Size))
+		liqPrice = position.EntryPrice.Sub(liquidationBuffer.Div(math.Abs(position.Size)))
 	} else {
 		// Short: LiqPrice = Entry + (Buffer / Size)
-		liqPrice = position.EntryPrice + (liquidationBuffer / math.Abs(position.Size))
+		liqPrice = position.EntryPrice.Add(liquidationBuffer.Div(math.Abs(position.Size)))
 	}
 
 	// Ensure liquidation price is positive
-	if liqPrice < 0 {
-		liqPrice = 0.01
+	if liqPrice.LessThan(math.Zero) {
+		liqPrice = math.Point01
 	}
 
 	return liqPrice
@@ -142,10 +143,10 @@ func (re *Engine) CheckLiquidation(position *domain.Position, markPrice decimal.
 	}
 
 	// Check if mark price crossed liquidation threshold
-	if position.Side == domain.SideBuy && markPrice <= position.LiquidationPrice {
+	if position.Side == domain.SideBuy && markPrice.LessThanOrEqual(position.LiquidationPrice) {
 		return true
 	}
-	if position.Side == domain.SideSell && markPrice >= position.LiquidationPrice {
+	if position.Side == domain.SideSell && markPrice.GreaterThanOrEqual(position.LiquidationPrice) {
 		return true
 	}
 
@@ -158,9 +159,9 @@ func (re *Engine) UpdatePositionMargin(position *domain.Position, markPrice deci
 
 	// Calculate unrealized PnL
 	if position.Side == domain.SideBuy {
-		position.UnrealizedPnL = (markPrice - position.EntryPrice) * position.Size
+		position.UnrealizedPnL = markPrice.Sub(position.EntryPrice).Mul(position.Size)
 	} else {
-		position.UnrealizedPnL = (position.EntryPrice - markPrice) * math.Abs(position.Size)
+		position.UnrealizedPnL = position.EntryPrice.Sub(markPrice).Mul(math.Abs(position.Size))
 	}
 
 	// Update liquidation price (may change with funding payments)

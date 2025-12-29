@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"vortex/internal/domain"
+	"vortex/pkg/id"
 	"vortex/pkg/math"
 )
 
@@ -85,14 +86,14 @@ func (me *MatchingEngine) matchLimitOrder(order *domain.Order, book *OrderBook, 
 	}
 
 	// Match against existing orders
-	for oppositeSide.Len() > 0 && order.FilledQty < order.Quantity {
+	for oppositeSide.Len() > 0 && order.FilledQty.LessThan(order.Quantity) {
 		topLevel := oppositeSide.levels[0]
 
 		// Check if price crosses
 		canMatch := false
-		if order.Side == domain.SideBuy && order.Price >= topLevel.Price {
+		if order.Side == domain.SideBuy && order.Price.GreaterThanOrEqual(topLevel.Price) {
 			canMatch = true
-		} else if order.Side == domain.SideSell && order.Price <= topLevel.Price {
+		} else if order.Side == domain.SideSell && order.Price.LessThanOrEqual(topLevel.Price) {
 			canMatch = true
 		}
 
@@ -101,13 +102,13 @@ func (me *MatchingEngine) matchLimitOrder(order *domain.Order, book *OrderBook, 
 		}
 
 		// Match with orders at this price level (FIFO)
-		for len(topLevel.Orders) > 0 && order.FilledQty < order.Quantity {
+		for len(topLevel.Orders) > 0 && order.FilledQty.LessThan(order.Quantity) {
 			makerOrder := topLevel.Orders[0]
-			matchQty := math.Min(order.Quantity-order.FilledQty, makerOrder.Quantity-makerOrder.FilledQty)
+			matchQty := math.Min(order.Quantity.Sub(order.FilledQty), makerOrder.Quantity.Sub(makerOrder.FilledQty))
 
 			// Create trade
 			trade := &domain.Trade{
-				ID:           math.GenerateID("trade"),
+				ID:           id.GenerateID("trade"),
 				Symbol:       order.Symbol,
 				Price:        makerOrder.Price, // Taker gets maker's price
 				Quantity:     matchQty,
@@ -130,12 +131,12 @@ func (me *MatchingEngine) matchLimitOrder(order *domain.Order, book *OrderBook, 
 			trades = append(trades, trade)
 
 			// Update filled quantities
-			order.FilledQty += matchQty
-			makerOrder.FilledQty += matchQty
-			topLevel.Volume -= matchQty
+			order.FilledQty = order.FilledQty.Add(matchQty)
+			makerOrder.FilledQty = makerOrder.FilledQty.Add(matchQty)
+			topLevel.Volume = topLevel.Volume.Sub(matchQty)
 
 			// Remove fully filled orders
-			if makerOrder.FilledQty >= makerOrder.Quantity {
+			if makerOrder.FilledQty.GreaterThanOrEqual(makerOrder.Quantity) {
 				makerOrder.Status = domain.OrderStatusFilled
 				topLevel.Orders = topLevel.Orders[1:]
 				delete(book.orderMap, makerOrder.ID)
@@ -149,9 +150,9 @@ func (me *MatchingEngine) matchLimitOrder(order *domain.Order, book *OrderBook, 
 	}
 
 	// Update order status
-	if order.FilledQty >= order.Quantity {
+	if order.FilledQty.GreaterThanOrEqual(order.Quantity) {
 		order.Status = domain.OrderStatusFilled
-	} else if order.FilledQty > 0 {
+	} else if order.FilledQty.GreaterThan(math.Zero) {
 		order.Status = domain.OrderStatusOpen
 	}
 
@@ -175,15 +176,15 @@ func (me *MatchingEngine) matchMarketOrder(order *domain.Order, book *OrderBook,
 		oppositeSide = book.Bids
 	}
 
-	for oppositeSide.Len() > 0 && order.FilledQty < order.Quantity {
+	for oppositeSide.Len() > 0 && order.FilledQty.LessThan(order.Quantity) {
 		topLevel := oppositeSide.levels[0]
 
-		for len(topLevel.Orders) > 0 && order.FilledQty < order.Quantity {
+		for len(topLevel.Orders) > 0 && order.FilledQty.LessThan(order.Quantity) {
 			makerOrder := topLevel.Orders[0]
-			matchQty := math.Min(order.Quantity-order.FilledQty, makerOrder.Quantity-makerOrder.FilledQty)
+			matchQty := math.Min(order.Quantity.Sub(order.FilledQty), makerOrder.Quantity.Sub(makerOrder.FilledQty))
 
 			trade := &domain.Trade{
-				ID:           math.GenerateID("trade"),
+				ID:           id.GenerateID("trade"),
 				Symbol:       order.Symbol,
 				Price:        makerOrder.Price,
 				Quantity:     matchQty,
@@ -205,11 +206,11 @@ func (me *MatchingEngine) matchMarketOrder(order *domain.Order, book *OrderBook,
 
 			trades = append(trades, trade)
 
-			order.FilledQty += matchQty
-			makerOrder.FilledQty += matchQty
-			topLevel.Volume -= matchQty
+			order.FilledQty = order.FilledQty.Add(matchQty)
+			makerOrder.FilledQty = makerOrder.FilledQty.Add(matchQty)
+			topLevel.Volume = topLevel.Volume.Sub(matchQty)
 
-			if makerOrder.FilledQty >= makerOrder.Quantity {
+			if makerOrder.FilledQty.GreaterThanOrEqual(makerOrder.Quantity) {
 				makerOrder.Status = domain.OrderStatusFilled
 				topLevel.Orders = topLevel.Orders[1:]
 				delete(book.orderMap, makerOrder.ID)
@@ -221,7 +222,7 @@ func (me *MatchingEngine) matchMarketOrder(order *domain.Order, book *OrderBook,
 		}
 	}
 
-	if order.FilledQty >= order.Quantity {
+	if order.FilledQty.GreaterThanOrEqual(order.Quantity) {
 		order.Status = domain.OrderStatusFilled
 	} else {
 		order.Status = domain.OrderStatusRejected // Market order couldn't fill completely

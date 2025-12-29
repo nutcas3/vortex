@@ -2,8 +2,18 @@ package math
 
 import "github.com/shopspring/decimal"
 
+// Constants
+var (
+	Zero     = decimal.NewFromInt(0)
+	One      = decimal.NewFromInt(1)
+	Point5   = decimal.NewFromFloat(0.5)
+	Point1   = decimal.NewFromFloat(0.1)
+	Point01  = decimal.NewFromFloat(0.01)
+	Point001 = decimal.NewFromFloat(0.001)
+)
+
 func Abs(x decimal.Decimal) decimal.Decimal {
-	if x.LessThan(decimal.Zero) {
+	if x.LessThan(Zero) {
 		return x.Neg()
 	}
 	return x

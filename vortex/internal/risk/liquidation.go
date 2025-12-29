@@ -9,7 +9,8 @@ import (
 
 	"vortex/internal/domain"
 	"vortex/internal/trading"
-	"vortex/pkg/utils"
+	"vortex/pkg/id"
+	"vortex/pkg/math"
 
 	"github.com/shopspring/decimal"
 )
@@ -139,12 +140,12 @@ func (le *LiquidationEngine) liquidatePosition(position *domain.Position) error 
 
 	// 1. Create liquidation order (opposite side, market order)
 	liquidationOrder := &domain.Order{
-		ID:          utils.GenerateID("liq_order"),
+		ID:          id.GenerateID("liq_order"),
 		UserID:      "LIQUIDATION_ENGINE", // System account
 		Symbol:      position.Symbol,
 		Side:        domain.SideSell,
 		Type:        domain.OrderTypeMarket,
-		Quantity:    utils.Abs(position.Size),
+		Quantity:    math.Abs(position.Size),
 		Status:      domain.OrderStatusOpen,
 		Timestamp:   time.Now(),
 		TimeInForce: "IOC", // Immediate or cancel
@@ -175,13 +176,13 @@ func (le *LiquidationEngine) liquidatePosition(position *domain.Position) error 
 	// Calculate realized PnL from liquidation
 	var totalPnL decimal.Decimal
 	for _, trade := range trades {
-		pnl := (trade.Price - position.EntryPrice) * trade.Quantity
+		pnl := trade.Price.Sub(position.EntryPrice).Mul(trade.Quantity)
 		if position.Side == domain.SideSell {
 			pnl = -pnl
 		}
 		totalPnL += pnl
 	}
-	position.RealizedPnL += totalPnL
+	position.RealizedPnL = position.RealizedPnL.Add(totalPnL)
 
 	// 5. Save updated position
 	if err := le.positionRepo.Save(le.ctx, position); err != nil {
@@ -190,8 +191,8 @@ func (le *LiquidationEngine) liquidatePosition(position *domain.Position) error 
 
 	// 6. Update account balance
 	account.Mu.Lock()
-	account.Balance += position.RealizedPnL
-	account.LockedBalance -= position.Margin
+	account.Balance = account.Balance.Add(position.RealizedPnL)
+	account.LockedBalance = account.LockedBalance.Sub(position.Margin)
 	delete(account.Positions, position.Symbol)
 	account.Mu.Unlock()
 
